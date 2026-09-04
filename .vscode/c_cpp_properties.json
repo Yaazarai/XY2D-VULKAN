@@ -1,0 +1,27 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/XY2D-LIB/**",
+                "C:/lib-includes/SDL3-3.4.2/",
+				"C:/lib-includes/SDL3-3.4.2/include/",
+				"C:/lib-includes/glm-master/",
+				"C:/VulkanSDK/1.4.341.0/Include/"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "_RELEASE"
+            ],
+            "windowsSdkVersion": "10.0.22000.0",
+            "compilerPath": "C:/Program Files/LLVM/bin/clang-cl.exe",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "linux-clang-x64",
+            "compilerArgs": []
+        }
+    ],
+    "version": 4
+}

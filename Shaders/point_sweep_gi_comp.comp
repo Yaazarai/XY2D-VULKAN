@@ -1,0 +1,15 @@
+#version 450
+#pragma shader_stage(compute)
+
+layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(set = 1, binding = 0, r11f_g11f_b10f) uniform image2D radiance;
+layout(set = 1, binding = 1, r11f_g11f_b10f) uniform image2D transmit;
+layout(set = 1, binding = 2, r11f_g11f_b10f) uniform image2D fluences;
+
+void main() {
+	//uvec2 workgroupXY = gl_WorkGroupID.xy;
+	//uvec2 workgroupSize = gl_WorkGroupSize.xy;
+	uvec2 coord = gl_GlobalInvocationID.xy;//(workgroupXY * workgroupSize) + gl_LocalInvocationID.xy;
+	vec4 uv = vec4(vec2(gl_GlobalInvocationID.xy) / vec2(imageSize(fluences)), 0.0, 1.0);
+	imageStore(fluences, ivec2(coord), uv);
+}

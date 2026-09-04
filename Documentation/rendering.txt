@@ -1,0 +1,40 @@
+Compute Passes:
+
+Create a compute pipeline: 
+	xy2d_gamestate::ComputePipeline(spirv_shader_path,_t storageTextures,_t samplerTextureCount,_t storageBuffers,_t uniformBufferCount, threadsXYZ);
+
+	NOTE: The XYZ threads should match the group size in the shader:
+		Pipeline: 	xy2d_gamestate::ComputePipeline(..., std::vec3(32, 32, 1.0));
+		Shader Layout: 	layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+Register the compute render function to either the onGameRender or onGamePreRRender events:
+	xy2d_gamestate::onGamePreRender.hook(xy2d_prerender_callback(point_sweep::preRenderPointSweep));
+	xy2d_gamestate::onGameRender.hook(xy2d_render_callback(point_sweep::preRenderPointSweep));
+
+Setup your compute pass in the compute render function:
+	This example binds two storage images and launches the required dispatch groups: render_size / group_size.
+	The general logic is begin ComputePass -> Bind Textures/Uniforms -> ComputeDispatch -> End ComputePass.
+
+	SDL_GPUComputePass* computePass = xy2d_renderer::ComputePassBegin(cmdbuffer, { radiance.texture, transmit.texture, fluences.texture }, {});
+	xy2d_renderer::BindComputeTextures(computePass, { emission.texture, absorption.texture });
+	int32_t xx = fluences.width / 32;
+	int32_t yy = fluences.height / 32;
+	xy2d_renderer::BindComputeDispatch(computePass, pointsweep_pipeline, glm::ivec3(xx, yy, 1));
+	xy2d_renderer::ComputePassEnd(computePass);
+
+Render Passes:
+
+	Rendering works the same as compute except instead you'll individually bind any vertex/fragment uniforms
+	and also pipe vertices for drawing along with passing a camera UBO to the vertex shader:
+
+	SDL_GPURenderPass* renderPassA = xy2d_renderer::RenderPassBegin(...;
+	glm::mat4 cameraData = xy2d_renderer::CameraTransform(...);
+	xy2d_renderer::BindVertexUniforms(...);
+	xy2d_renderer::BindFragmentUniforms(...);
+	xy2d_renderer::PipeVertices(renderPass, renderPipeline, vertexBuffer);
+	xy2d_renderer::DrawVertices(...);
+	xy2d_renderer::RenderPassEnd(...);
+
+Both Compute and Render passes can be executed sequentially within a single command buffer / render event.
+
+Using Copy passes can be done using single-submit commands e.g. xy2d_gamestate::UploadBuffer() or you can inject a copy pass directly into an exeisting command buffer from a render function: xy2d_gamestate::UploadBufferPass().
