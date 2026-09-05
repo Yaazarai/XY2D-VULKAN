@@ -40,6 +40,14 @@
 				return closing.load(std::memory_order_relaxed);
 			}
 			
+			inline static uint32_t GetWindowWidth() {
+				return width.load(std::memory_order_relaxed);
+			}
+			
+			inline static uint32_t GetWindowHeight() {
+				return height.load(std::memory_order_relaxed);
+			}
+			
 			inline static std::vector<const char*> GetInstanceExtensions() {
 				uint32_t extensionCount = 0;
 				const char* const* extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
@@ -65,6 +73,7 @@
 			
 			inline static SDL_AppResult AppInit(void** appstate, int argc, char* argv[]) {
 				SDL_SetAppMetadata("xy2d engine (SDL3)", "1.0", VK_NULL_HANDLE);
+				
 				extent = glm::vec2(std::max(extent.x, minimum.x), std::max(extent.y, minimum.y));
 				width.store(static_cast<uint32_t>(extent.x));
 				height.store(static_cast<uint32_t>(extent.y));
@@ -105,10 +114,7 @@
 	}
 	
 	static void SDL_AppQuit(void* appstate, SDL_AppResult result) { xy2d::xy2d_window::AppQuit(appstate, result); }
-	
 	static SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) { return xy2d::xy2d_window::AppInit(appstate, argc, argv); }
-	
 	static SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) { return xy2d::xy2d_window::AppEvent(appstate, event); }
-	
 	static SDL_AppResult SDL_AppIterate(void* appstate) { return xy2d::xy2d_window::AppIterate(appstate); }
 #endif

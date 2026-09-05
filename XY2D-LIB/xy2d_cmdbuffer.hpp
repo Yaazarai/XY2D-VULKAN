@@ -62,15 +62,13 @@
 				: vkdevice(vkdevice), swapChainIamge(swapChainIamge), cmdbuffer(cmdbuffer), timestampQueryPool(timestampQueryPool) {}
 			
 			void ExecutionBarrier(XY2D_PIPELINESTAGES destinationStage, XY2D_ACCESSSTAGES destinationAccessFlags, std::vector<VkImageMemoryBarrier2>& imageMemoryBarriers) {
-				VkMemoryBarrier2 memoryBarrier = xy2d_wrappers::defaultMemoryBarrier;
-				memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+				VkMemoryBarrier2 memoryBarrier = { .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
 				memoryBarrier.srcStageMask = static_cast<VkPipelineStageFlags2>(currentStageFlags);
 				memoryBarrier.dstStageMask = static_cast<VkPipelineStageFlags2>(destinationStage);
 				memoryBarrier.srcAccessMask = static_cast<VkAccessFlags2>(currentAccessFlags);
 				memoryBarrier.dstAccessMask = static_cast<VkAccessFlags2>(destinationAccessFlags);
 				
-				VkDependencyInfo dependencyInfo = xy2d_wrappers::defaultDependencyInfo;
-				dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+				VkDependencyInfo dependencyInfo = { .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
 				dependencyInfo.memoryBarrierCount = 1U;
 				dependencyInfo.pMemoryBarriers = &memoryBarrier;
 				dependencyInfo.imageMemoryBarrierCount = imageMemoryBarriers.size();
@@ -104,17 +102,28 @@
 					}
 					
 					image->imageLayout = static_cast<XY2D_IMAGELAYOUT>(imageLayout);
-					
 					imageMemoryBarriers.push_back(imageBarrier);
 				}
 				
 				ExecutionBarrier(destinationStage, destinationAccessFlags, imageMemoryBarriers);
 			}
 			
+			std::vector<glm::float64_t> QueryTimeStamps() {
+				std::vector<glm::float64_t> frametimes;
+				#if XY2D_VALIDATION
+					std::vector<VkDeviceSize> timestamps(timestampQueryIndex);
+					vkGetQueryPoolResults(vkdevice.logicalDevice, timestampQueryPool, 0, timestamps.size(), timestamps.size() * sizeof(VkDeviceSize), timestamps.data(), sizeof(VkDeviceSize), VK_QUERY_RESULT_64_BIT);
+					
+					for(int i = 0; i < timestampQueryIndex; i ++) {
+						double ts = double(timestamps[i]) * (double(vkdevice.deviceProperties.properties.limits.timestampPeriod) / 1000000.0);
+						frametimes.push_back(ts);
+					}
+				#endif
+				return frametimes;
+			}
+			
 			void InjectTimestamp() {
 				#if XY2D_VALIDATION
-					if (timestampQueryIndex == 0)
-						vkCmdResetQueryPool(cmdbuffer, timestampQueryPool, 0U, XY2D_TIMESTAMPS_COUNT * 2U);
 					vkCmdWriteTimestamp(cmdbuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, timestampQueryPool, timestampQueryIndex ++);
 				#endif
 			}
@@ -131,24 +140,17 @@
 				std::vector<VkColorComponentFlags> colorWriteMasks;
 				
 				for(xy2d_image* image : renderTargets) {
-					VkRenderingAttachmentInfoKHR colorAttachmentInfo = xy2d_wrappers::defaultColorAttachmentInfo;
-					colorAttachmentInfo.clearValue = renderState.clearColor;
-					colorAttachmentInfo.loadOp = ((renderState.clearOnLoad)?VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE);
-					colorAttachmentInfo.imageView = image->imageView;
-					colorAttachmentInfo.imageLayout = (VkImageLayout) image->imageLayout;
+					VkRenderingAttachmentInfoKHR colorAttachmentInfo = { .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, .imageView = image->imageView, .imageLayout = (VkImageLayout) image->imageLayout, .clearValue = renderState.clearColor, .loadOp = ((renderState.clearOnLoad)?VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE), .storeOp = VK_ATTACHMENT_STORE_OP_STORE };
+					VkColorBlendEquationEXT blendingEquation = { .colorBlendOp = VK_BLEND_OP_ADD, .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA, .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, .alphaBlendOp = VK_BLEND_OP_ADD, .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE, .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA };
 					colorAttachmentInfos.push_back(colorAttachmentInfo);
-					colorBlendEqs.push_back(xy2d_wrappers::defaultBlendingEquation);
+					colorBlendEqs.push_back(blendingEquation);
 					colorBlending.push_back(renderState.blending);
 					colorWriteMasks.push_back(image->colorWriteMask);
 					colorWrites.push_back(VK_TRUE);
 				}
 				
-				VkRenderingInfoKHR dynamicRenderInfo = xy2d_wrappers::defaultDynamicRenderInfo;
-				dynamicRenderInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachmentInfos.size());
-				dynamicRenderInfo.pColorAttachments = colorAttachmentInfos.data();
-				dynamicRenderInfo.renderArea = renderArea;
+				VkRenderingInfoKHR dynamicRenderInfo = { .sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR, .pColorAttachments = colorAttachmentInfos.data(), .colorAttachmentCount = static_cast<uint32_t>(colorAttachmentInfos.size()), .renderArea = renderArea, .layerCount = 1, };
 				vkCmdBeginRenderingKHRXY2D(cmdbuffer, &dynamicRenderInfo);
-				
 				vkCmdBindShadersEXTXY2D(cmdbuffer, pipeline.shaderStages.size(), reinterpret_cast<VkShaderStageFlagBits*>(pipeline.shaderStages.data()), pipeline.shaderObjects.data());
 				vkCmdSetViewportWithCountEXTXY2D(cmdbuffer, 1U, &dynamicViewPort);
 				vkCmdSetScissorWithCountEXTXY2D(cmdbuffer, 1U, &renderArea);
@@ -172,7 +174,6 @@
 				VkSampleMask sampleMask = VK_SAMPLE_COUNT_1_BIT;
 				vkCmdSetRasterizationSamplesEXTXY2D(cmdbuffer, VK_SAMPLE_COUNT_1_BIT);
 				vkCmdSetSampleMaskEXTXY2D(cmdbuffer, VK_SAMPLE_COUNT_1_BIT, &sampleMask);
-				
 				vkCmdSetAlphaToCoverageEnableEXTXY2D(cmdbuffer, VK_FALSE);
 				vkCmdSetPrimitiveRestartEnableEXTXY2D(cmdbuffer, VK_FALSE);
 				vkCmdSetCullModeEXTXY2D(cmdbuffer, VK_CULL_MODE_NONE);
@@ -206,7 +207,6 @@
 			
 			void ComputeBegin(xy2d_pipeline& pipeline) {
 				TransitionImageLayouts(VK_IMAGE_LAYOUT_GENERAL, XY2D_PIPELINESTAGES::COMPUTE, XY2D_ACCESSSTAGES::COMPUTE, {});
-				
 				vkCmdBindShadersEXTXY2D(cmdbuffer, pipeline.shaderStages.size(), reinterpret_cast<VkShaderStageFlagBits*>(pipeline.shaderStages.data()), pipeline.shaderObjects.data());
 			}
 			

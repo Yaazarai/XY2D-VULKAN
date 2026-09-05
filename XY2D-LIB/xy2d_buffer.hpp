@@ -29,6 +29,7 @@
 				onDispose.hook(xy2d_callback<>([this]() {
 					vmaDestroyBuffer(this->vkdevice.memoryAllocator, this->buffer, this->memory);
 				}));
+				
 				initialized = Initialize();
 			}
 			
@@ -36,13 +37,14 @@
 				return { buffer, offset, range };
 			}
 			
-			inline static VkWriteDescriptorSet GetWriteDescriptor(uint32_t binding, uint32_t descriptorCount, const VkDescriptorBufferInfo* bufferInfo) {
+			VkWriteDescriptorSet GetWriteDescriptor(uint32_t binding, uint32_t descriptorCount, const VkDescriptorBufferInfo* bufferInfo) {
 				return { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pBufferInfo = bufferInfo, .dstSet = 0, .dstBinding = binding, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = descriptorCount };
 			}
 			
 			VkResult CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flags) {
 				VkBufferCreateInfo bufCreateInfo = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = size, .usage = usage };
 				VmaAllocationCreateInfo allocCreateInfo { .usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST, .flags = flags };
+				
 				return vmaCreateBuffer(vkdevice.memoryAllocator, &bufCreateInfo, &allocCreateInfo, &buffer, &memory, &description);
 			}
 			

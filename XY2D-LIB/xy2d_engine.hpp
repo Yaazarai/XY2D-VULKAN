@@ -46,7 +46,7 @@
 		#define XY2D_CMDBUFFER_COUNT 64U
 	#endif
 	#ifndef XY2D_TIMESTAMPS_COUNT
-		#define XY2D_TIMESTAMPS_COUNT 128U
+		#define XY2D_TIMESTAMPS_COUNT 256U
 	#endif
 	
 	#include <thread>

@@ -17,8 +17,9 @@ xy2d_buffer* stage_buffer;
 xy2d_buffer* vertex_buffer;
 xy2d_buffer* camera_buffer;
 xy2d_sprite present_sprite;
-glm::float32 theta = 0.0;
+
 std::thread* renderThread;
+glm::float32 theta = 0.0;
 
 glm::mat4 CameraTransform(glm::vec2 cameraSize, glm::vec2 cameraPosition, glm::vec2 cameraScale = glm::vec2(1.0f), glm::float32_t cameraTheta = 0.0f, glm::vec2 zNearFar = glm::vec2(1.0f, -1.0f)) {
     glm::vec2 cameraCenter = cameraSize / 2.0f;
@@ -33,6 +34,8 @@ glm::mat4 CameraTransform(glm::vec2 cameraSize, glm::vec2 cameraPosition, glm::v
 void PresentScene(xy2d_renderer& renderer, xy2d_cmdbuffer& cmdbuffer) {
 	theta += 0.25 * 0.125;
 	present_sprite.Rotate(theta);
+	glm::vec2 center = glm::vec2(xy2d_window::GetWindowWidth(), xy2d_window::GetWindowHeight()) * glm::vec2(0.5);
+	present_sprite.Position(center);
 	present_sprite.Update();
 	
 	glm::mat4 cameraData = CameraTransform(xy2d_window::extent, glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0));
@@ -47,6 +50,9 @@ void PresentScene(xy2d_renderer& renderer, xy2d_cmdbuffer& cmdbuffer) {
 }
 
 void RenderScene() {
+	uint32_t frameIndex = 0U;
+	double framePrevious = 0.0;
+	
 	while(!xy2d_window::GetWindowCloseRequest()) {
 		auto frameStart = std::chrono::steady_clock::now();
 		renderer->RenderSwapChain();
@@ -54,7 +60,13 @@ void RenderScene() {
 		
 		double frameTime = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
 		double fps = 1000.0 / frameTime;
-		printf("Frame: %.3f ms (%.1f FPS)\n", frameTime, fps);
+		//printf("Frame: %.3f ms (%.1f FPS)\n", frameTime, fps);
+		
+		double frameSpan = 1000.0 / 240.0;
+		std::cout << "FRAME: [" << frameIndex << "] : " << ((renderer->frameTimeStamps[1] - framePrevious) - frameSpan) << std::endl;
+		framePrevious = renderer->frameTimeStamps[0];
+		
+		frameIndex ++;
 	}
 }
 
