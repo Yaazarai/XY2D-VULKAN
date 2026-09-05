@@ -1,7 +1,8 @@
 #include ".\XY2D-LIB\xy2d_engine.hpp"
 using namespace xy2d;
 
-#define FRAG "./Shaders/default_output_frag.spv"
+#define UVFRAG "./Shaders/uvout_frag.spv"
+#define FRAG "./Shaders/texture_output_frag.spv"
 #define VERT "./Shaders/default_output_vert.spv"
 
 struct camera_ubo {
@@ -11,11 +12,18 @@ struct camera_ubo {
 xy2d_device* vkdevice;
 xy2d_renderer* renderer;
 xy2d_pipeline* pipeline;
+xy2d_pipeline* pipeline_uv;
+
 xy2d_shader* vert_shader;
 xy2d_shader* frag_shader;
+xy2d_shader* uvfrag_shader;
+
 xy2d_buffer* stage_buffer;
 xy2d_buffer* vertex_buffer;
 xy2d_buffer* camera_buffer;
+
+xy2d_image* sampler_image;
+
 xy2d_sprite present_sprite;
 
 std::thread* renderThread;
@@ -32,7 +40,7 @@ glm::mat4 CameraTransform(glm::vec2 cameraSize, glm::vec2 cameraPosition, glm::v
 }
 
 void PresentScene(xy2d_renderer& renderer, xy2d_cmdbuffer& cmdbuffer) {
-	theta += 0.25 * 0.125;
+	theta += 0.25 * 0.00125;
 	present_sprite.Rotate(theta);
 	glm::vec2 center = glm::vec2(xy2d_window::GetWindowWidth(), xy2d_window::GetWindowHeight()) * glm::vec2(0.5);
 	present_sprite.Position(center);
@@ -42,8 +50,19 @@ void PresentScene(xy2d_renderer& renderer, xy2d_cmdbuffer& cmdbuffer) {
 	cmdbuffer.TransferBuffer(cameraData, 0U, stage_buffer, camera_buffer);
 	cmdbuffer.TransferBuffer(present_sprite.vertices, sizeof(glm::mat4), stage_buffer, vertex_buffer);
 	
+	cmdbuffer.TransitionImageLayouts(VK_IMAGE_LAYOUT_GENERAL, XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, { sampler_image });
+	
+	cmdbuffer.RenderBegin(*pipeline_uv, { sampler_image }, { 0U, 0U, sampler_image->width, sampler_image->height });
+	cmdbuffer.RenderPushBuffer(*pipeline_uv, *camera_buffer, 0);
+	cmdbuffer.RenderBindVertexBuffer(*vertex_buffer);
+	cmdbuffer.RenderDrawVertices(6, 0, 1);
+	cmdbuffer.RenderEnd();
+	
+	cmdbuffer.TransitionImageLayouts(VK_IMAGE_LAYOUT_GENERAL, XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, { sampler_image });
+	
 	cmdbuffer.RenderBegin(*pipeline, { &cmdbuffer.swapChainIamge }, { 0U, 0U, cmdbuffer.swapChainIamge.width, cmdbuffer.swapChainIamge.height });
 	cmdbuffer.RenderPushBuffer(*pipeline, *camera_buffer, 0);
+	cmdbuffer.RenderPushImage(*pipeline, *sampler_image, 1);
 	cmdbuffer.RenderBindVertexBuffer(*vertex_buffer);
 	cmdbuffer.RenderDrawVertices(6, 0, 1);
 	cmdbuffer.RenderEnd();
@@ -74,13 +93,19 @@ void xy2d_window::WindowAppInit() {
 	vkdevice = new xy2d_device();
 	renderer = new xy2d_renderer(*vkdevice);
 	vert_shader = new xy2d_shader(VERT, XY2D_SHADERSTAGE::VERTEX, { XY2D_DESCRIPTORS::UBO });
-	frag_shader = new xy2d_shader(FRAG, XY2D_SHADERSTAGE::FRAGMENT, {});
+	frag_shader = new xy2d_shader(FRAG, XY2D_SHADERSTAGE::FRAGMENT, { XY2D_DESCRIPTORS::SAMPLER });
+	uvfrag_shader = new xy2d_shader(UVFRAG, XY2D_SHADERSTAGE::FRAGMENT, {});
+	
 	pipeline = new xy2d_pipeline(*vkdevice, { *vert_shader, *frag_shader, });
+	pipeline_uv = new xy2d_pipeline(*vkdevice, { *vert_shader, *uvfrag_shader, });
+	
 	stage_buffer = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::STAGING, static_cast<VkDeviceSize>(sizeof(glm::mat4) + present_sprite.SizeOf()));
 	vertex_buffer = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::VERTEX, static_cast<VkDeviceSize>(present_sprite.SizeOf()));
 	camera_buffer = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::UNIFORM, static_cast<VkDeviceSize>(sizeof(glm::mat4)));
 	
-	present_sprite.Size(glm::vec2(700.0, 700.0));
+	sampler_image = new xy2d_image(*vkdevice, XY2D_IMAGETYPE::ATTACHEMENT, 640, 480);
+	
+	present_sprite.Size(glm::vec2(640.0, 480.0));
 	glm::vec2 center = glm::vec2(present_sprite.xywh[2], present_sprite.xywh[3]) * glm::vec2(0.5);
 	present_sprite.Origin(center);
 	present_sprite.Position(center);
@@ -96,6 +121,7 @@ void xy2d_window::WindowAppInit() {
 			delete renderThread;
 		}
 		
+		delete sampler_image;
 		delete stage_buffer;
 		delete vertex_buffer;
 		delete renderer;

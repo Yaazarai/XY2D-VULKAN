@@ -186,13 +186,13 @@
 			
 			void RenderPushBuffer(xy2d_pipeline& pipeline, xy2d_buffer& uniformBuffer, VkDeviceSize bindingIndex) {
 				VkDescriptorBufferInfo bufferDescriptor = uniformBuffer.GetDescriptorInfo();
-				VkWriteDescriptorSet bufferDescriptorSet = uniformBuffer.GetWriteDescriptor(0, 1, &bufferDescriptor);
+				VkWriteDescriptorSet bufferDescriptorSet = uniformBuffer.GetWriteDescriptor(bindingIndex, 1, &bufferDescriptor);
 				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, 1, &bufferDescriptorSet);
 			}
 			
 			void RenderPushImage(xy2d_pipeline& pipeline, xy2d_image& uniformImage, VkDeviceSize bindingIndex) {
 				VkDescriptorImageInfo imageDescriptor = uniformImage.GetDescriptorInfo();
-				VkWriteDescriptorSet imageDescriptorSet = uniformImage.GetWriteDescriptor(0, 1, &imageDescriptor);
+				VkWriteDescriptorSet imageDescriptorSet = uniformImage.GetWriteDescriptor(bindingIndex, 1, &imageDescriptor);
 				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, 1, &imageDescriptorSet);
 			}
 			
