@@ -61,7 +61,32 @@
 			xy2d_cmdbuffer(xy2d_device& vkdevice, xy2d_image& swapChainIamge, VkCommandBuffer& cmdbuffer, VkQueryPool& timestampQueryPool)
 				: vkdevice(vkdevice), swapChainIamge(swapChainIamge), cmdbuffer(cmdbuffer), timestampQueryPool(timestampQueryPool) {}
 			
-			void ExecutionBarrier(XY2D_PIPELINESTAGES destinationStage, XY2D_ACCESSSTAGES destinationAccessFlags, std::vector<VkImageMemoryBarrier2>& imageMemoryBarriers) {
+			void ExecutionBarrier(XY2D_PIPELINESTAGES destinationStage, XY2D_ACCESSSTAGES destinationAccessFlags, std::vector<xy2d_image*> imageTargets, XY2D_IMAGELAYOUT imageLayout = XY2D_IMAGELAYOUT::GENERAL) {
+				std::vector<VkImageMemoryBarrier2> imageMemoryBarriers;
+				
+				for(xy2d_image* image : imageTargets) {
+					VkImageMemoryBarrier2 imageBarrier = {};
+					imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+					imageBarrier.srcAccessMask = static_cast<VkAccessFlags2>(currentAccessFlags);
+					imageBarrier.dstAccessMask = static_cast<VkAccessFlags2>(destinationAccessFlags);
+					imageBarrier.srcStageMask = static_cast<VkPipelineStageFlags2>(currentStageFlags);
+					imageBarrier.dstStageMask = static_cast<VkPipelineStageFlags2>(destinationStage);
+					imageBarrier.srcQueueFamilyIndex = vkdevice.queueFamily.renderFamily;
+					imageBarrier.dstQueueFamilyIndex = vkdevice.queueFamily.renderFamily;
+					imageBarrier.subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1, };
+					imageBarrier.image = image->imageSource;
+					imageBarrier.oldLayout = static_cast<VkImageLayout>(image->imageLayout);
+					imageBarrier.newLayout = static_cast<VkImageLayout>(imageLayout);
+					
+					if (image->imageLayout == XY2D_IMAGELAYOUT::PRESENT_SRCKHR) {
+						imageBarrier.srcAccessMask = VK_ACCESS_2_NONE;
+						imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+					}
+					
+					image->imageLayout = imageLayout;
+					imageMemoryBarriers.push_back(imageBarrier);
+				}
+				
 				VkMemoryBarrier2 memoryBarrier = { .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
 				memoryBarrier.srcStageMask = static_cast<VkPipelineStageFlags2>(currentStageFlags);
 				memoryBarrier.dstStageMask = static_cast<VkPipelineStageFlags2>(destinationStage);
@@ -75,37 +100,8 @@
 				dependencyInfo.pImageMemoryBarriers = imageMemoryBarriers.data();
 				vkCmdPipelineBarrier2(cmdbuffer, &dependencyInfo);
 				
-				currentStageFlags = static_cast<VkPipelineStageFlags2>(destinationStage);
 				currentAccessFlags = static_cast<VkAccessFlags2>(destinationAccessFlags);
-			}
-			
-			void TransitionImageLayouts(VkImageLayout imageLayout, XY2D_PIPELINESTAGES destinationStage, XY2D_ACCESSSTAGES destinationAccessFlags, std::vector<xy2d_image*> dependencyImages) {
-				std::vector<VkImageMemoryBarrier2> imageMemoryBarriers;
-				
-				for(xy2d_image* image : dependencyImages) {
-					VkImageMemoryBarrier2 imageBarrier = {};
-					imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-					imageBarrier.srcAccessMask = static_cast<VkAccessFlags2>(currentAccessFlags);
-					imageBarrier.dstAccessMask = static_cast<VkAccessFlags2>(destinationAccessFlags);
-					imageBarrier.srcStageMask = static_cast<VkPipelineStageFlags2>(currentStageFlags);
-					imageBarrier.dstStageMask = static_cast<VkPipelineStageFlags2>(destinationStage);
-					imageBarrier.srcQueueFamilyIndex = vkdevice.queueFamily.renderFamily;
-					imageBarrier.dstQueueFamilyIndex = vkdevice.queueFamily.renderFamily;
-					imageBarrier.subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1, };
-					imageBarrier.image = image->imageSource;
-					imageBarrier.oldLayout = static_cast<VkImageLayout>(image->imageLayout);
-					imageBarrier.newLayout = imageLayout;
-					
-					if (image->imageLayout == XY2D_IMAGELAYOUT::PRESENT_SRCKHR) {
-						imageBarrier.srcAccessMask = VK_ACCESS_2_NONE;
-						imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
-					}
-					
-					image->imageLayout = static_cast<XY2D_IMAGELAYOUT>(imageLayout);
-					imageMemoryBarriers.push_back(imageBarrier);
-				}
-				
-				ExecutionBarrier(destinationStage, destinationAccessFlags, imageMemoryBarriers);
+				currentStageFlags = static_cast<VkPipelineStageFlags2>(destinationStage);
 			}
 			
 			std::vector<glm::float64_t> QueryTimeStamps() {
@@ -128,8 +124,8 @@
 				#endif
 			}
 			
-			void RenderBegin(xy2d_pipeline& pipeline, std::vector<xy2d_image*> renderTargets, glm::ivec4 xywh, xy2d_renderstate renderState = xy2d_renderstate()) {
-				TransitionImageLayouts(VK_IMAGE_LAYOUT_GENERAL, XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, renderTargets);
+			void RenderBegin(xy2d_pipeline* pipeline, std::vector<xy2d_image*> imageTargets, glm::ivec4 xywh, xy2d_renderstate renderState = xy2d_renderstate()) {
+				ExecutionBarrier(XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, imageTargets, XY2D_IMAGELAYOUT::GENERAL);
 				
 				VkRect2D renderArea = { .offset = { xywh[0], xywh[1] }, .extent = { static_cast<uint32_t>(xywh[2]), static_cast<uint32_t>(xywh[3]) } };
 				VkViewport dynamicViewPort = { .minDepth = 0.0f, .maxDepth = 1.0f, .width = static_cast<float>(xywh[2]), .height = static_cast<float>(xywh[3]), };
@@ -139,7 +135,7 @@
 				std::vector<VkRenderingAttachmentInfoKHR> colorAttachmentInfos;
 				std::vector<VkColorComponentFlags> colorWriteMasks;
 				
-				for(xy2d_image* image : renderTargets) {
+				for(xy2d_image* image : imageTargets) {
 					VkRenderingAttachmentInfoKHR colorAttachmentInfo = { .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, .imageView = image->imageView, .imageLayout = (VkImageLayout) image->imageLayout, .clearValue = renderState.clearColor, .loadOp = ((renderState.clearOnLoad)?VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE), .storeOp = VK_ATTACHMENT_STORE_OP_STORE };
 					VkColorBlendEquationEXT blendingEquation = { .colorBlendOp = VK_BLEND_OP_ADD, .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA, .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, .alphaBlendOp = VK_BLEND_OP_ADD, .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE, .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA };
 					colorAttachmentInfos.push_back(colorAttachmentInfo);
@@ -151,7 +147,7 @@
 				
 				VkRenderingInfoKHR dynamicRenderInfo = { .sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR, .pColorAttachments = colorAttachmentInfos.data(), .colorAttachmentCount = static_cast<uint32_t>(colorAttachmentInfos.size()), .renderArea = renderArea, .layerCount = 1, };
 				vkCmdBeginRenderingKHRXY2D(cmdbuffer, &dynamicRenderInfo);
-				vkCmdBindShadersEXTXY2D(cmdbuffer, pipeline.shaderStages.size(), reinterpret_cast<VkShaderStageFlagBits*>(pipeline.shaderStages.data()), pipeline.shaderObjects.data());
+				vkCmdBindShadersEXTXY2D(cmdbuffer, pipeline->shaderStages.size(), reinterpret_cast<VkShaderStageFlagBits*>(pipeline->shaderStages.data()), pipeline->shaderObjects.data());
 				vkCmdSetViewportWithCountEXTXY2D(cmdbuffer, 1U, &dynamicViewPort);
 				vkCmdSetScissorWithCountEXTXY2D(cmdbuffer, 1U, &renderArea);
 				vkCmdSetColorWriteEnableEXTXY2D(cmdbuffer, colorWrites.size(), colorWrites.data());
@@ -184,42 +180,54 @@
 				vkCmdEndRenderingKHRXY2D(cmdbuffer);
 			}
 			
-			void RenderPushBuffer(xy2d_pipeline& pipeline, xy2d_buffer& uniformBuffer, VkDeviceSize bindingIndex) {
-				VkDescriptorBufferInfo bufferDescriptor = uniformBuffer.GetDescriptorInfo();
-				VkWriteDescriptorSet bufferDescriptorSet = uniformBuffer.GetWriteDescriptor(bindingIndex, 1, &bufferDescriptor);
-				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, 1, &bufferDescriptorSet);
+			void RenderPushBuffer(xy2d_pipeline* pipeline, xy2d_buffer* uniformBuffer, VkDeviceSize binding) {
+				VkDescriptorBufferInfo bufferDescriptor = { .buffer = uniformBuffer->buffer, .offset = 0U, .range = VK_WHOLE_SIZE };
+				VkWriteDescriptorSet bufferDescriptorSet = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pBufferInfo = &bufferDescriptor, .dstBinding = static_cast<uint32_t>(binding), .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1U };
+				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipelineLayout, 0U, 1U, &bufferDescriptorSet);
 			}
 			
-			void RenderPushImage(xy2d_pipeline& pipeline, xy2d_image& uniformImage, VkDeviceSize bindingIndex) {
-				VkDescriptorImageInfo imageDescriptor = uniformImage.GetDescriptorInfo();
-				VkWriteDescriptorSet imageDescriptorSet = uniformImage.GetWriteDescriptor(bindingIndex, 1, &imageDescriptor);
-				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipelineLayout, 0, 1, &imageDescriptorSet);
+			void RenderPushImageSampler(xy2d_pipeline* pipeline, xy2d_image* uniformImage, VkDeviceSize binding) {
+				VkDescriptorImageInfo imageDescriptor = { .sampler = uniformImage->imageSampler, .imageView = uniformImage->imageView, .imageLayout = (VkImageLayout) uniformImage->imageLayout };
+				VkWriteDescriptorSet imageDescriptorSet = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pImageInfo = &imageDescriptor, .dstBinding = static_cast<uint32_t>(binding), .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1U };
+				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipelineLayout, 0U, 1U, &imageDescriptorSet);
 			}
 			
-			void RenderBindVertexBuffer(xy2d_buffer& vertexBuffer, uint32_t firstBinding = 0U) {
+			void RenderPushImageStorage(xy2d_pipeline* pipeline, xy2d_image* uniformImage, VkDeviceSize binding) {
+				VkDescriptorImageInfo imageDescriptor = { .sampler = uniformImage->imageSampler, .imageView = uniformImage->imageView, .imageLayout = (VkImageLayout) uniformImage->imageLayout };
+				VkWriteDescriptorSet imageDescriptorSet = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pImageInfo = &imageDescriptor, .dstBinding = static_cast<uint32_t>(binding), .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1U };
+				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipelineLayout, 0U, 1U, &imageDescriptorSet);
+			}
+			
+			void RenderBindVertexBuffer(xy2d_buffer* vertexBuffer, uint32_t firstBinding = 0U) {
 				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(cmdbuffer, firstBinding, 1, &vertexBuffer.buffer, offsets);
+				vkCmdBindVertexBuffers(cmdbuffer, firstBinding, 1, &vertexBuffer->buffer, offsets);
 			}
 			
 			void RenderDrawVertices(uint32_t vertexCount, uint32_t firstVertex, uint32_t instanceCount) {
 				vkCmdDraw(cmdbuffer, vertexCount, instanceCount, firstVertex, 0);
 			}
 			
-			void ComputeBegin(xy2d_pipeline& pipeline) {
-				TransitionImageLayouts(VK_IMAGE_LAYOUT_GENERAL, XY2D_PIPELINESTAGES::COMPUTE, XY2D_ACCESSSTAGES::COMPUTE, {});
-				vkCmdBindShadersEXTXY2D(cmdbuffer, pipeline.shaderStages.size(), reinterpret_cast<VkShaderStageFlagBits*>(pipeline.shaderStages.data()), pipeline.shaderObjects.data());
+			void ComputeBegin(xy2d_pipeline* pipeline) {
+				ExecutionBarrier(XY2D_PIPELINESTAGES::COMPUTE, XY2D_ACCESSSTAGES::COMPUTE, {});
+				vkCmdBindShadersEXTXY2D(cmdbuffer, pipeline->shaderStages.size(), reinterpret_cast<VkShaderStageFlagBits*>(pipeline->shaderStages.data()), pipeline->shaderObjects.data());
 			}
 			
-			void ComputePushBuffer(xy2d_pipeline& pipeline, xy2d_buffer& uniformBuffer, VkDeviceSize bindingIndex) {
-				VkDescriptorBufferInfo bufferDescriptor = uniformBuffer.GetDescriptorInfo();
-				VkWriteDescriptorSet bufferDescriptorSet = uniformBuffer.GetWriteDescriptor(0, 1, &bufferDescriptor);
-				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.pipelineLayout, 0, 1, &bufferDescriptorSet);
+			void ComputePushBuffer(xy2d_pipeline* pipeline, xy2d_buffer* uniformBuffer, VkDeviceSize binding) {
+				VkDescriptorBufferInfo bufferDescriptor = { .buffer = uniformBuffer->buffer, .offset = 0U, .range = VK_WHOLE_SIZE };
+				VkWriteDescriptorSet bufferDescriptorSet = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pBufferInfo = &bufferDescriptor, .dstSet = 0, .dstBinding = static_cast<uint32_t>(binding), .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1U };
+				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipelineLayout, 0, 1, &bufferDescriptorSet);
 			}
 			
-			void ComputePushImage(xy2d_pipeline& pipeline, xy2d_image& uniformImage, VkDeviceSize bindingIndex) {
-				VkDescriptorImageInfo imageDescriptor = uniformImage.GetDescriptorInfo();
-				VkWriteDescriptorSet imageDescriptorSet = uniformImage.GetWriteDescriptor(0, 1, &imageDescriptor);
-				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline.pipelineLayout, 0, 1, &imageDescriptorSet);
+			void ComputePushImageSampler(xy2d_pipeline* pipeline, xy2d_image* uniformImage, VkDeviceSize binding) {
+				VkDescriptorImageInfo imageDescriptor = { .sampler = uniformImage->imageSampler, .imageView = uniformImage->imageView, .imageLayout = (VkImageLayout) uniformImage->imageLayout };
+				VkWriteDescriptorSet imageDescriptorSet = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pImageInfo = &imageDescriptor, .dstSet = 0, .dstBinding = static_cast<uint32_t>(binding), .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1U };
+				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipelineLayout, 0, 1, &imageDescriptorSet);
+			}
+			
+			void ComputePushImageStorage(xy2d_pipeline* pipeline, xy2d_image* uniformImage, VkDeviceSize binding) {
+				VkDescriptorImageInfo imageDescriptor = { .sampler = uniformImage->imageSampler, .imageView = uniformImage->imageView, .imageLayout = (VkImageLayout) uniformImage->imageLayout };
+				VkWriteDescriptorSet imageDescriptorSet = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pImageInfo = &imageDescriptor, .dstSet = 0, .dstBinding = static_cast<uint32_t>(binding), .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1U };
+				vkCmdPushDescriptorSetKHRXY2D(cmdbuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipelineLayout, 0, 1, &imageDescriptorSet);
 			}
 			
 			void ComputeEnd(glm::ivec3 groupSize) {
@@ -228,10 +236,12 @@
 			
 			template<typename T>
 			void TransferBufferList(std::vector<T> dataList, uint32_t sizeOfObject, uint32_t offsetOfData, xy2d_buffer* stageBuffer, xy2d_buffer* buffer) {
-				TransitionImageLayouts(VK_IMAGE_LAYOUT_GENERAL, XY2D_PIPELINESTAGES::TRANSFER, XY2D_ACCESSSTAGES::TRANSFER, {});
+				ExecutionBarrier(XY2D_PIPELINESTAGES::TRANSFER, XY2D_ACCESSSTAGES::TRANSFER, {});
 				
-				for(size_t i = 0; i < dataList.size(); i++)
-					SDL_memcpy(memory + (i * sizeOfObject), dataList[i], sizeOfObject);
+				for(size_t i = 0; i < dataList.size(); i++) {
+					void* stagedOffset = static_cast<int8_t*>(stageBuffer->description.pMappedData) + offsetOfData + (i * sizeOfObject);
+					SDL_memcpy(stagedOffset, dataList[i], sizeOfObject);
+				}
 				
 				VkDeviceSize sizeOfData = static_cast<VkDeviceSize>(dataList.size() * sizeOfObject);
 				VkBufferCopy copyRegion { .srcOffset = offsetOfData, .dstOffset = 0, .size = sizeOfData };
@@ -244,7 +254,7 @@
 			}
 			
 			void TransferBufferEXT(void* dataPointer, size_t sizeOfData, size_t offsetOfData, xy2d_buffer* stageBuffer, xy2d_buffer* buffer) {
-				TransitionImageLayouts(VK_IMAGE_LAYOUT_GENERAL, XY2D_PIPELINESTAGES::TRANSFER, XY2D_ACCESSSTAGES::TRANSFER, {});
+				ExecutionBarrier(XY2D_PIPELINESTAGES::TRANSFER, XY2D_ACCESSSTAGES::TRANSFER, {});
 				
 				void* stagedOffset = static_cast<int8_t*>(stageBuffer->description.pMappedData) + offsetOfData;
 				SDL_memcpy(stagedOffset, dataPointer, sizeOfData);
@@ -259,7 +269,7 @@
 			}
 			
 			void TransferImageEXT(void* dataPointer, uint32_t sizeOfData, uint32_t offsetOfData, uint32_t xpos, uint32_t ypos, uint32_t width, uint32_t height, xy2d_buffer* stageBuffer, xy2d_image* image) {
-				TransitionImageLayouts(VK_IMAGE_LAYOUT_GENERAL, XY2D_PIPELINESTAGES::TRANSFER, XY2D_ACCESSSTAGES::TRANSFER, { image });
+				ExecutionBarrier(XY2D_PIPELINESTAGES::TRANSFER, XY2D_ACCESSSTAGES::TRANSFER, { image });
 				
 				void* stagedOffset = static_cast<int8_t*>(stageBuffer->description.pMappedData) + offsetOfData;
 				SDL_memcpy(stagedOffset, dataPointer, sizeOfData);

@@ -39,33 +39,35 @@ glm::mat4 CameraTransform(glm::vec2 cameraSize, glm::vec2 cameraPosition, glm::v
     return projection;
 }
 
-void PresentScene(xy2d_renderer& renderer, xy2d_cmdbuffer& cmdbuffer) {
+void PresentScene(xy2d_cmdbuffer* cmdbuffer, xy2d_image* swapChainImage) {
 	theta += 0.25 * 0.00125;
 	present_sprite.Rotate(theta);
 	glm::vec2 center = glm::vec2(xy2d_window::GetWindowWidth(), xy2d_window::GetWindowHeight()) * glm::vec2(0.5);
 	present_sprite.Position(center);
 	present_sprite.Update();
 	
+	/*
+		NOTE: Buffer / Image memory is shared PER-RENDER-PASS due to using only one command buffer.
+		So if you want separate camera transforms, etc. you need a unique UBO per render pass.
+	*/
 	glm::mat4 cameraData = CameraTransform(xy2d_window::extent, glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0));
-	cmdbuffer.TransferBuffer(cameraData, 0U, stage_buffer, camera_buffer);
-	cmdbuffer.TransferBuffer(present_sprite.vertices, sizeof(glm::mat4), stage_buffer, vertex_buffer);
+	cmdbuffer->TransferBuffer(cameraData, 0U, stage_buffer, camera_buffer);
+	cmdbuffer->TransferBuffer(present_sprite.vertices, sizeof(glm::mat4), stage_buffer, vertex_buffer);
 	
-	cmdbuffer.TransitionImageLayouts(VK_IMAGE_LAYOUT_GENERAL, XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, { sampler_image });
+	cmdbuffer->ExecutionBarrier(XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, { sampler_image });
+	cmdbuffer->RenderBegin(pipeline_uv, { sampler_image }, { 0U, 0U, sampler_image->width, sampler_image->height });
+	cmdbuffer->RenderPushBuffer(pipeline_uv, camera_buffer, 0);
+	cmdbuffer->RenderBindVertexBuffer(vertex_buffer);
+	cmdbuffer->RenderDrawVertices(6, 0, 1);
+	cmdbuffer->RenderEnd();
 	
-	cmdbuffer.RenderBegin(*pipeline_uv, { sampler_image }, { 0U, 0U, sampler_image->width, sampler_image->height });
-	cmdbuffer.RenderPushBuffer(*pipeline_uv, *camera_buffer, 0);
-	cmdbuffer.RenderBindVertexBuffer(*vertex_buffer);
-	cmdbuffer.RenderDrawVertices(6, 0, 1);
-	cmdbuffer.RenderEnd();
-	
-	cmdbuffer.TransitionImageLayouts(VK_IMAGE_LAYOUT_GENERAL, XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, { sampler_image });
-	
-	cmdbuffer.RenderBegin(*pipeline, { &cmdbuffer.swapChainIamge }, { 0U, 0U, cmdbuffer.swapChainIamge.width, cmdbuffer.swapChainIamge.height });
-	cmdbuffer.RenderPushBuffer(*pipeline, *camera_buffer, 0);
-	cmdbuffer.RenderPushImage(*pipeline, *sampler_image, 1);
-	cmdbuffer.RenderBindVertexBuffer(*vertex_buffer);
-	cmdbuffer.RenderDrawVertices(6, 0, 1);
-	cmdbuffer.RenderEnd();
+	cmdbuffer->ExecutionBarrier(XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, { sampler_image });
+	cmdbuffer->RenderBegin(pipeline, { swapChainImage }, { 0U, 0U, swapChainImage->width, swapChainImage->height });
+	cmdbuffer->RenderPushBuffer(pipeline, camera_buffer, 0);
+	cmdbuffer->RenderPushImageSampler(pipeline, sampler_image, 1);
+	cmdbuffer->RenderBindVertexBuffer(vertex_buffer);
+	cmdbuffer->RenderDrawVertices(6, 0, 1);
+	cmdbuffer->RenderEnd();
 }
 
 void RenderScene() {
@@ -111,7 +113,7 @@ void xy2d_window::WindowAppInit() {
 	present_sprite.Position(center);
 	present_sprite.Update();
 	
-	renderer->renderEvent.hook(xy2d_callback<xy2d_renderer&, xy2d_cmdbuffer&>(PresentScene));
+	renderer->renderEvent.hook(xy2d_callback<xy2d_cmdbuffer*, xy2d_image*>(PresentScene));
 	renderThread = new std::thread([](){ RenderScene(); });
 	//xy2d_window::onAppIterate.hook(xy2d_callback<>(RenderScene));
 	

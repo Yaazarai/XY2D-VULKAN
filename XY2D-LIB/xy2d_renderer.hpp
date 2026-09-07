@@ -7,7 +7,7 @@
 		class xy2d_renderer : xy2d_disposable {
 		public:
 			xy2d_device& vkdevice;
-			xy2d_invoker<xy2d_renderer&, xy2d_cmdbuffer&> renderEvent;
+			xy2d_invoker<xy2d_cmdbuffer*, xy2d_image*> renderEvent;
 			
 			std::vector<xy2d_image*> swapChainImages = std::vector<xy2d_image*>(XY2D_BUFFERED_IMAGES);
 			VkSwapchainKHR swapChain = VK_NULL_HANDLE;
@@ -96,16 +96,16 @@
 				vkResetCommandBuffer(commandBuffers[swapChainAcquiredIndex], 0U);
 				VkCommandBufferBeginInfo commandBufferBeginInfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT };
 				vkBeginCommandBuffer(commandBuffers[swapChainAcquiredIndex], &commandBufferBeginInfo);
-					xy2d_cmdbuffer cmdbuffer (vkdevice, *swapChainImages[swapChainAcquiredIndex], commandBuffers[swapChainAcquiredIndex], timestampQueryPool);
-						cmdbuffer.InjectTimestamp();
-						renderEvent.invoke(*this, cmdbuffer);
-						cmdbuffer.TransitionImageLayouts(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, XY2D_PIPELINESTAGES::PRESENT, XY2D_ACCESSSTAGES::PRESENT, { swapChainImages[swapChainAcquiredIndex] });
-						cmdbuffer.InjectTimestamp();
-					frameTimeStamps = cmdbuffer.QueryTimeStamps();
+					xy2d_cmdbuffer cmdbuffer = xy2d_cmdbuffer(vkdevice, *swapChainImages[swapChainAcquiredIndex], commandBuffers[swapChainAcquiredIndex], timestampQueryPool);
+					cmdbuffer.InjectTimestamp();
+					renderEvent.invoke(&cmdbuffer, swapChainImages[swapChainAcquiredIndex]);
+					cmdbuffer.ExecutionBarrier(XY2D_PIPELINESTAGES::PRESENT, XY2D_ACCESSSTAGES::PRESENT, { swapChainImages[swapChainAcquiredIndex], }, XY2D_IMAGELAYOUT::PRESENT_SRCKHR);
+					cmdbuffer.InjectTimestamp();
 				vkEndCommandBuffer(commandBuffers[swapChainAcquiredIndex]);
 				
 				vkWaitForFences(vkdevice.logicalDevice, 1U, &swapChainFinished, VK_TRUE, UINT64_MAX);
 				vkResetFences(vkdevice.logicalDevice, 1U, &swapChainFinished);
+				frameTimeStamps = cmdbuffer.QueryTimeStamps();
 				vkResetQueryPool(vkdevice.logicalDevice, timestampQueryPool, 0, XY2D_TIMESTAMPS_COUNT);
 				
 				VkCommandBufferSubmitInfo cmdBufferSubmitInfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };

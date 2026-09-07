@@ -28,7 +28,6 @@
 			VkColorComponentFlags colorWriteMask;
 			VkSamplerAddressMode addressMode;
 			VkBool32 lerpFilter;
-			
 			XY2D_IMAGETYPE sourceType = XY2D_IMAGETYPE::ATTACHEMENT;
 			XY2D_IMAGELAYOUT imageLayout = XY2D_IMAGELAYOUT::UNINITIALIZED;
 			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
@@ -49,14 +48,6 @@
 					}
 				}));
 				initialized = Initialize();
-			}
-			
-			VkDescriptorImageInfo GetDescriptorInfo() {
-				return { imageSampler, imageView, (VkImageLayout) imageLayout };
-			}
-			
-			VkWriteDescriptorSet GetWriteDescriptor(uint32_t binding, uint32_t descriptorCount, const VkDescriptorImageInfo* imageInfo, VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-				return { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pImageInfo = imageInfo, .dstSet = 0, .dstBinding = binding, .descriptorType = descriptorType, .descriptorCount = descriptorCount };
 			}
 			
 			VkResult CreateImage(XY2D_IMAGETYPE sourceType, uint32_t width, uint32_t height, VkFormat rgbaFormat = VK_FORMAT_R16G16B16A16_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VkBool32 lerpFilter = false) {
@@ -82,8 +73,7 @@
 				VkSamplerCreateInfo imageSamplerInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .magFilter = VK_FILTER_NEAREST, .minFilter = VK_FILTER_NEAREST, .anisotropyEnable = VK_FALSE, .compareEnable = VK_FALSE, .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK, .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .unnormalizedCoordinates = VK_FALSE, .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR, .minLod = 0.0f, .maxLod = VK_LOD_CLAMP_NONE };
 				imageSamplerInfo.addressModeU = imageSamplerInfo.addressModeV = imageSamplerInfo.addressModeW = addressMode;
 				imageSamplerInfo.mipmapMode = (lerpFilter)? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
-				VkResult result = vkCreateSampler(vkdevice.logicalDevice, &imageSamplerInfo, VK_NULL_HANDLE, &imageSampler);
-				if (result != VK_SUCCESS) return result;
+				vkCreateSampler(vkdevice.logicalDevice, &imageSamplerInfo, VK_NULL_HANDLE, &imageSampler);
 				
 				VkImageViewCreateInfo imageViewCreateInfo = { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, .viewType = VK_IMAGE_VIEW_TYPE_2D, .components = { VK_COMPONENT_SWIZZLE_IDENTITY }, .subresourceRange = { .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1, .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT } };
 				imageViewCreateInfo.image = imageSource;
