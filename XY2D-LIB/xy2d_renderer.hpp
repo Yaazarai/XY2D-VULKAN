@@ -21,6 +21,7 @@
 			std::vector<VkSemaphore> swapChainPresented = std::vector<VkSemaphore>(XY2D_BUFFERED_IMAGES);
 			VkFence swapChainAcquired = VK_NULL_HANDLE;
 			VkFence swapChainFinished = VK_NULL_HANDLE;
+			std::atomic<VkBool32> swapChainWaitRender = VK_FALSE;
 			
 			VkSurfaceFormatKHR presentFormat = { VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
 			VkSurfaceCapabilitiesKHR capabilities = {};
@@ -43,17 +44,10 @@
 				initialized = Initialize();
 			}
 			
-			VkResult RecreateFence(VkFence& fence, VkBool32 signaled) {
-				if (fence != VK_NULL_HANDLE) vkDestroyFence(this->vkdevice.logicalDevice, fence, VK_NULL_HANDLE);
-				VkFenceCreateInfo fenceCreateInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = static_cast<VkFenceCreateFlags>(signaled) };
-				return vkCreateFence(vkdevice.logicalDevice, &fenceCreateInfo, VK_NULL_HANDLE, &fence);
-			}
-			
 			VkResult ReCreateSwapChainImages() {
 				std::vector<VkSurfaceFormatKHR> surfaceFormats;
 				xy2d_wrappers::Enumerate(surfaceFormats, vkGetPhysicalDeviceSurfaceFormatsKHR, vkdevice.physicalDevice, vkdevice.presentSurface);
 				auto findFormat = std::find_if(surfaceFormats.begin(), surfaceFormats.end(), [this](const VkSurfaceFormatKHR& format) { return this->presentFormat.colorSpace == format.colorSpace && this->presentFormat.format == format.format; });
-				
 				if (findFormat == surfaceFormats.end())
 					findFormat = std::find_if(surfaceFormats.begin(), surfaceFormats.end(), [this](const VkSurfaceFormatKHR& format) { return this->presentFormat.colorSpace == format.colorSpace; });
 				presentFormat = *findFormat;
@@ -61,7 +55,7 @@
 				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vkdevice.physicalDevice, vkdevice.presentSurface, &capabilities);
 				uint32_t width = std::clamp(xy2d_window::GetWindowWidth(), capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
 				uint32_t height = std::clamp(xy2d_window::GetWindowHeight(), capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-				if (width <= 0 || height <= 0) return VK_NOT_READY;
+				if (width <= 0 || height <= 0) return VK_ERROR_OUT_OF_DATE_KHR;
 				
 				VkExtent2D swapChainExtent = { width, height };
 				VkSwapchainCreateInfoKHR swapChainCreateInfo = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, .imageArrayLayers = 1, .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, .presentMode = VK_PRESENT_MODE_FIFO_KHR, .clipped = VK_TRUE };
@@ -80,12 +74,16 @@
 				
 				std::vector<VkImage> newSwapImages = std::vector<VkImage>(XY2D_BUFFERED_IMAGES);
 				xy2d_wrappers::Enumerate(newSwapImages, vkGetSwapchainImagesKHR, vkdevice.logicalDevice, swapChain);
-				
 				for(uint32_t i = 0; i < swapChainImages.size(); i++)
 					swapChainImages[i] = new xy2d_image(vkdevice, XY2D_IMAGETYPE::SWAPCHAIN, swapChainExtent.width, swapChainExtent.height, presentFormat.format, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_FALSE, newSwapImages[i]);
 				
-				RecreateFence(this->swapChainAcquired, VK_FALSE);
-				RecreateFence(this->swapChainFinished, VK_TRUE);
+				if (swapChainAcquired != VK_NULL_HANDLE) vkDestroyFence(vkdevice.logicalDevice, swapChainAcquired, VK_NULL_HANDLE);
+				VkFenceCreateInfo unsignaledFenceCreateInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = static_cast<VkFenceCreateFlags>(VK_FALSE) };
+				vkCreateFence(vkdevice.logicalDevice, &unsignaledFenceCreateInfo, VK_NULL_HANDLE, &swapChainAcquired);
+				
+				if (swapChainFinished != VK_NULL_HANDLE) vkDestroyFence(this->vkdevice.logicalDevice, swapChainFinished, VK_NULL_HANDLE);
+				VkFenceCreateInfo signaledFenceCreateInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = static_cast<VkFenceCreateFlags>(VK_TRUE) };
+				vkCreateFence(vkdevice.logicalDevice, &signaledFenceCreateInfo, VK_NULL_HANDLE, &swapChainFinished);
 				return result;
 			}
 			
@@ -108,32 +106,24 @@
 				frameTimeStamps = cmdbuffer.QueryTimeStamps();
 				vkResetQueryPool(vkdevice.logicalDevice, timestampQueryPool, 0, XY2D_TIMESTAMPS_COUNT);
 				
-				VkCommandBufferSubmitInfo cmdBufferSubmitInfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
-				cmdBufferSubmitInfo.commandBuffer = commandBuffers[swapChainAcquiredIndex];
-				
-				VkSemaphoreSubmitInfo signalSemaphoreInfo = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT };
-				signalSemaphoreInfo.semaphore = swapChainPresented[swapChainAcquiredIndex];
-				
-				VkSubmitInfo2 queueSubmitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2, .commandBufferInfoCount = 1U, .signalSemaphoreInfoCount = 1U, .waitSemaphoreInfoCount = 0U };
-				queueSubmitInfo.pCommandBufferInfos = &cmdBufferSubmitInfo;
-				queueSubmitInfo.pSignalSemaphoreInfos = &signalSemaphoreInfo;
-				VkResult result = vkQueueSubmit2(vkdevice.deviceRenderQueue, 1U, &queueSubmitInfo, swapChainFinished);
-				if (result != VK_SUCCESS) return result;
-				
-				VkPresentInfoKHR presentInfo = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .swapchainCount = 1U, .waitSemaphoreCount = 1U };
-				presentInfo.pImageIndices = &swapChainAcquiredIndex;
-				presentInfo.pSwapchains = &swapChain;
-				presentInfo.pWaitSemaphores = &swapChainPresented[swapChainAcquiredIndex];
+				VkCommandBufferSubmitInfo cmdBufferSubmitInfo = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, .commandBuffer = commandBuffers[swapChainAcquiredIndex] };
+				VkSemaphoreSubmitInfo signalSemaphoreInfo = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, .semaphore = swapChainPresented[swapChainAcquiredIndex] };
+				VkSubmitInfo2 queueSubmitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2, .commandBufferInfoCount = 1U, .signalSemaphoreInfoCount = 1U, .waitSemaphoreInfoCount = 0U, .pCommandBufferInfos = &cmdBufferSubmitInfo, .pSignalSemaphoreInfos = &signalSemaphoreInfo };
+				VkPresentInfoKHR presentInfo = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .swapchainCount = 1U, .waitSemaphoreCount = 1U, .pImageIndices = &swapChainAcquiredIndex, .pSwapchains = &swapChain, .pWaitSemaphores = &swapChainPresented[swapChainAcquiredIndex] };
+				swapChainWaitRender.exchange(VK_TRUE, std::memory_order_relaxed);
+				vkQueueSubmit2(vkdevice.deviceRenderQueue, 1U, &queueSubmitInfo, swapChainFinished);
 				return vkQueuePresentKHR(vkdevice.deviceRenderQueue, &presentInfo);
 			}
 			
 			VkResult RenderSwapChain() {
 				VkResult result = vkAcquireNextImageKHR(vkdevice.logicalDevice, swapChain, UINT64_MAX, VK_NULL_HANDLE, swapChainAcquired, &swapChainAcquiredIndex);
-				if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) return FrameRenderAndPresent();
+				if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
+					return FrameRenderAndPresent();
 				
-				if (vkGetFenceStatus(vkdevice.logicalDevice, swapChainFinished) == VK_NOT_READY)
+				if (swapChainWaitRender.load(std::memory_order_relaxed) == VK_TRUE)
 					vkWaitForFences(vkdevice.logicalDevice, 1U, &swapChainFinished, VK_TRUE, UINT64_MAX);
 				vkResetFences(vkdevice.logicalDevice, 1U, &swapChainFinished);
+				swapChainWaitRender.exchange(VK_FALSE, std::memory_order_relaxed);
 				return ReCreateSwapChainImages();
 			}
 			

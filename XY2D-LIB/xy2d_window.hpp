@@ -8,9 +8,9 @@
 		public:
 			inline static SDL_Window* handle = VK_NULL_HANDLE;
 			inline static glm::vec2 minimum = glm::vec2(640.0, 480.0);
+			inline static std::atomic<bool> closing = false;
 			inline static std::atomic<uint32_t> width;
 			inline static std::atomic<uint32_t> height;
-			inline static std::atomic<bool> closing;
 			inline static std::vector<std::string> events;
 			
 			inline static xy2d::xy2d_invoker<> onAppQuit;
@@ -55,8 +55,7 @@
 			inline static SDL_AppResult LogEvent(SDL_AppResult result, std::vector<std::string> list) {
 				#if XY2D_VALIDATION
 					std::stringstream stream;
-					for(std::string ss : list)
-						stream << ss;
+					for(std::string ss : list) stream << ss;
 					events.push_back(stream.str());
 					std::cout << "xy2d: " << stream.str() << std::endl;
 				#endif
@@ -71,11 +70,8 @@
 			
 			inline static SDL_AppResult AppInit(void** appstate, int argc, char* argv[]) {
 				SDL_SetAppMetadata("xy2d engine (SDL3)", "1.0", VK_NULL_HANDLE);
-				
-				glm::vec2 extent = glm::vec2(std::max(extent.x, minimum.x), std::max(extent.y, minimum.y));
-				width.store(static_cast<uint32_t>(extent.x));
-				height.store(static_cast<uint32_t>(extent.y));
-				closing.store(false);
+				width.store(static_cast<uint32_t>(minimum.x));
+				height.store(static_cast<uint32_t>(minimum.y));
 				
 				if (!SDL_Init(SDL_INIT_VIDEO))
 					return LogEvent(SDL_APP_FAILURE, { "Couldn't initialize SDL: ", SDL_GetError() });
@@ -90,9 +86,7 @@
 			
 			inline static SDL_AppResult AppEvent(void* appstate, SDL_Event* event) {
 				SDL_AppResult result = (event->type == SDL_EVENT_QUIT || event->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)? SDL_APP_SUCCESS : SDL_APP_CONTINUE;
-				
-				if (event->type == SDL_EVENT_QUIT || event->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
-					closing.store(true);
+				closing.store(event->type == SDL_EVENT_QUIT || event->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED);
 				
 				int width, height;
 				SDL_GetWindowSizeInPixels(handle, &width, &height);

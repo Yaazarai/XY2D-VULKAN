@@ -99,7 +99,6 @@
 				dependencyInfo.imageMemoryBarrierCount = imageMemoryBarriers.size();
 				dependencyInfo.pImageMemoryBarriers = imageMemoryBarriers.data();
 				vkCmdPipelineBarrier2(cmdbuffer, &dependencyInfo);
-				
 				currentAccessFlags = static_cast<VkAccessFlags2>(destinationAccessFlags);
 				currentStageFlags = static_cast<VkPipelineStageFlags2>(destinationStage);
 			}
