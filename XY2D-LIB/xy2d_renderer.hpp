@@ -43,20 +43,27 @@
 				initialized = Initialize();
 			}
 			
+			VkResult RecreateFence(VkFence& fence, VkBool32 signaled) {
+				if (fence != VK_NULL_HANDLE) vkDestroyFence(this->vkdevice.logicalDevice, fence, VK_NULL_HANDLE);
+				VkFenceCreateInfo fenceCreateInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = static_cast<VkFenceCreateFlags>(signaled) };
+				return vkCreateFence(vkdevice.logicalDevice, &fenceCreateInfo, VK_NULL_HANDLE, &fence);
+			}
+			
 			VkResult ReCreateSwapChainImages() {
 				std::vector<VkSurfaceFormatKHR> surfaceFormats;
 				xy2d_wrappers::Enumerate(surfaceFormats, vkGetPhysicalDeviceSurfaceFormatsKHR, vkdevice.physicalDevice, vkdevice.presentSurface);
-				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vkdevice.physicalDevice, vkdevice.presentSurface, &capabilities);
-				
 				auto findFormat = std::find_if(surfaceFormats.begin(), surfaceFormats.end(), [this](const VkSurfaceFormatKHR& format) { return this->presentFormat.colorSpace == format.colorSpace && this->presentFormat.format == format.format; });
+				
 				if (findFormat == surfaceFormats.end())
 					findFormat = std::find_if(surfaceFormats.begin(), surfaceFormats.end(), [this](const VkSurfaceFormatKHR& format) { return this->presentFormat.colorSpace == format.colorSpace; });
 				presentFormat = *findFormat;
 				
+				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vkdevice.physicalDevice, vkdevice.presentSurface, &capabilities);
 				uint32_t width = std::clamp(xy2d_window::GetWindowWidth(), capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
 				uint32_t height = std::clamp(xy2d_window::GetWindowHeight(), capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-				VkExtent2D swapChainExtent = { width, height };
+				if (width <= 0 || height <= 0) return VK_NOT_READY;
 				
+				VkExtent2D swapChainExtent = { width, height };
 				VkSwapchainCreateInfoKHR swapChainCreateInfo = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, .imageArrayLayers = 1, .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE, .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, .presentMode = VK_PRESENT_MODE_FIFO_KHR, .clipped = VK_TRUE };
 				swapChainCreateInfo.surface = vkdevice.presentSurface;
 				swapChainCreateInfo.minImageCount = XY2D_BUFFERED_IMAGES;
@@ -77,15 +84,8 @@
 				for(uint32_t i = 0; i < swapChainImages.size(); i++)
 					swapChainImages[i] = new xy2d_image(vkdevice, XY2D_IMAGETYPE::SWAPCHAIN, swapChainExtent.width, swapChainExtent.height, presentFormat.format, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_FALSE, newSwapImages[i]);
 				
-				if (this->swapChainAcquired != VK_NULL_HANDLE)
-					vkDestroyFence(this->vkdevice.logicalDevice, this->swapChainAcquired, VK_NULL_HANDLE);
-				VkFenceCreateInfo unsignaledFenceCreateInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-				vkCreateFence(vkdevice.logicalDevice, &unsignaledFenceCreateInfo, VK_NULL_HANDLE, &swapChainAcquired);
-				
-				if (this->swapChainFinished != VK_NULL_HANDLE)
-					vkDestroyFence(this->vkdevice.logicalDevice, this->swapChainFinished, VK_NULL_HANDLE);
-				VkFenceCreateInfo signaledFenceCreateInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT };
-				vkCreateFence(vkdevice.logicalDevice, &signaledFenceCreateInfo, VK_NULL_HANDLE, &swapChainFinished);
+				RecreateFence(this->swapChainAcquired, VK_FALSE);
+				RecreateFence(this->swapChainFinished, VK_TRUE);
 				return result;
 			}
 			
@@ -129,10 +129,10 @@
 			
 			VkResult RenderSwapChain() {
 				VkResult result = vkAcquireNextImageKHR(vkdevice.logicalDevice, swapChain, UINT64_MAX, VK_NULL_HANDLE, swapChainAcquired, &swapChainAcquiredIndex);
-				if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
-					return FrameRenderAndPresent();
+				if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) return FrameRenderAndPresent();
 				
-				vkWaitForFences(vkdevice.logicalDevice, 1U, &swapChainFinished, VK_TRUE, UINT64_MAX);
+				if (vkGetFenceStatus(vkdevice.logicalDevice, swapChainFinished) == VK_NOT_READY)
+					vkWaitForFences(vkdevice.logicalDevice, 1U, &swapChainFinished, VK_TRUE, UINT64_MAX);
 				vkResetFences(vkdevice.logicalDevice, 1U, &swapChainFinished);
 				return ReCreateSwapChainImages();
 			}

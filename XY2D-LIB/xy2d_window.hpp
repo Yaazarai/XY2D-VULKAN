@@ -7,7 +7,6 @@
 		class xy2d_window {
 		public:
 			inline static SDL_Window* handle = VK_NULL_HANDLE;
-			inline static glm::vec2 extent = glm::vec2(0.0, 0.0);
 			inline static glm::vec2 minimum = glm::vec2(640.0, 480.0);
 			inline static std::atomic<uint32_t> width;
 			inline static std::atomic<uint32_t> height;
@@ -22,12 +21,11 @@
 			inline static void WindowAppInit();
 			
 			inline static void SetWindowSize(int32_t width, int32_t height) {
-				extent = glm::vec2(std::max(width, static_cast<int32_t>(minimum.x)), std::max(height, static_cast<int32_t>(minimum.y)));
-				xy2d_window::width.store(static_cast<uint32_t>(extent.x));
-				xy2d_window::height.store(static_cast<uint32_t>(extent.y));
+				xy2d_window::width.store(static_cast<uint32_t>(std::max(width, static_cast<int32_t>(minimum.x))), std::memory_order_relaxed);
+				xy2d_window::height.store(static_cast<uint32_t>(std::max(height, static_cast<int32_t>(minimum.y))), std::memory_order_relaxed);
 				
 				if (handle != VK_NULL_HANDLE)
-					SDL_SetWindowSize(handle, static_cast<int32_t>(extent.x), static_cast<int32_t>(extent.y));
+					SDL_SetWindowSize(handle, static_cast<int32_t>(xy2d_window::width), static_cast<int32_t>(xy2d_window::height));
 			}
 			
 			inline static VkSurfaceKHR GetWindowSurface(VkInstance vkinst) {
@@ -74,7 +72,7 @@
 			inline static SDL_AppResult AppInit(void** appstate, int argc, char* argv[]) {
 				SDL_SetAppMetadata("xy2d engine (SDL3)", "1.0", VK_NULL_HANDLE);
 				
-				extent = glm::vec2(std::max(extent.x, minimum.x), std::max(extent.y, minimum.y));
+				glm::vec2 extent = glm::vec2(std::max(extent.x, minimum.x), std::max(extent.y, minimum.y));
 				width.store(static_cast<uint32_t>(extent.x));
 				height.store(static_cast<uint32_t>(extent.y));
 				closing.store(false);
@@ -82,7 +80,7 @@
 				if (!SDL_Init(SDL_INIT_VIDEO))
 					return LogEvent(SDL_APP_FAILURE, { "Couldn't initialize SDL: ", SDL_GetError() });
 				
-				if ((handle = SDL_CreateWindow("xy2d engine", extent.x, extent.y, SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN)) == VK_NULL_HANDLE)
+				if ((handle = SDL_CreateWindow("xy2d engine", xy2d_window::width, xy2d_window::height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN)) == VK_NULL_HANDLE)
 					return LogEvent(SDL_APP_FAILURE, { "Couldn't create window: ", SDL_GetError() });
 				
 				SDL_SetWindowMinimumSize(handle, minimum.x, minimum.y);
@@ -96,12 +94,10 @@
 				if (event->type == SDL_EVENT_QUIT || event->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
 					closing.store(true);
 				
-				if (event->type == SDL_EVENT_WINDOW_RESIZED) {
-					extent = glm::vec2(std::max(event->window.data1, static_cast<int32_t>(minimum.x)), std::max(event->window.data2, static_cast<int32_t>(minimum.y)));
-					width.store(static_cast<uint32_t>(extent.x));
-					height.store(static_cast<uint32_t>(extent.y));
-				}
-				
+				int width, height;
+				SDL_GetWindowSizeInPixels(handle, &width, &height);
+				xy2d_window::width.store(static_cast<uint32_t>(width), std::memory_order_relaxed);
+				xy2d_window::height.store(static_cast<uint32_t>(height), std::memory_order_relaxed);
 				onAppEvent.invoke(event);
 				return result;
 			}

@@ -5,9 +5,7 @@
 
 	namespace XY2D_NAMESPACE {
 		enum class XY2D_BUFFERTYPE {
-			VERTEX,
-			UNIFORM,
-			STAGING
+			VERTEX, UNIFORM, STAGING
 		};
 		
 		class xy2d_buffer : public xy2d_disposable {

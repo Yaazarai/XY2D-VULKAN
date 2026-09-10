@@ -36,7 +36,7 @@
 		#define VKDECLARE_EXTFN(FN,SFX) PFN_##FN FN##SFX = VK_NULL_HANDLE
 		
 		#define VKIMPORTS_EXTFN(FN,SFX) FN##SFX = (PFN_##FN) vkGetInstanceProcAddr(instance, #FN); \
-			if (FN##SFX == VK_NULL_HANDLE) { std::cout << "xy2d-engine: Failed to load VK_KHR_dynamic_rendering EXT function: PFN_"#FN << std::endl; return VK_ERROR_FEATURE_NOT_PRESENT; }
+			if (FN##SFX == VK_NULL_HANDLE) { std::cout << "xy2d-engine: Failed to load extension function: PFN_"#FN << std::endl; return VK_ERROR_FEATURE_NOT_PRESENT; }
 		
 		VKDECLARE_EXTFN(vkCmdBeginRenderingKHR,XY2D);
 		VKDECLARE_EXTFN(vkCmdEndRenderingKHR,XY2D);

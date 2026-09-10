@@ -108,6 +108,7 @@
 				std::vector<glm::float64_t> frametimes;
 				#if XY2D_VALIDATION
 					std::vector<VkDeviceSize> timestamps(timestampQueryIndex);
+					
 					vkGetQueryPoolResults(vkdevice.logicalDevice, timestampQueryPool, 0, timestamps.size(), timestamps.size() * sizeof(VkDeviceSize), timestamps.data(), sizeof(VkDeviceSize), VK_QUERY_RESULT_64_BIT);
 					
 					for(int i = 0; i < timestampQueryIndex; i ++) {
@@ -253,13 +254,13 @@
 				TransferBufferEXT(&dataPointer, sizeof(dataPointer), offsetOfData, stageBuffer, buffer);
 			}
 			
-			void TransferBufferEXT(void* dataPointer, size_t sizeOfData, size_t offsetOfData, xy2d_buffer* stageBuffer, xy2d_buffer* buffer) {
+			void TransferBufferEXT(void* dataPointer, size_t sizeOfData, size_t offsetOfData, xy2d_buffer* stageBuffer, xy2d_buffer* buffer, uint32_t dstOffset = 0U) {
 				ExecutionBarrier(XY2D_PIPELINESTAGES::TRANSFER, XY2D_ACCESSSTAGES::TRANSFER, {});
 				
 				void* stagedOffset = static_cast<int8_t*>(stageBuffer->description.pMappedData) + offsetOfData;
 				SDL_memcpy(stagedOffset, dataPointer, sizeOfData);
 				
-				VkBufferCopy copyRegion { .srcOffset = offsetOfData, .dstOffset = 0, .size = sizeOfData };
+				VkBufferCopy copyRegion { .srcOffset = offsetOfData, .dstOffset = dstOffset, .size = sizeOfData };
 				vkCmdCopyBuffer(cmdbuffer, stageBuffer->buffer, buffer->buffer, 1, &copyRegion);
 			}
 			
