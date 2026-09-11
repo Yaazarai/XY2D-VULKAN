@@ -86,7 +86,7 @@ void RenderScene() {
 	
 	while(!xy2d_window::GetWindowCloseRequest()) {
 		auto frameStart = std::chrono::steady_clock::now();
-		renderer->RenderSwapChain();
+		renderer->FrameRenderAndPresent();
 		auto frameEnd = std::chrono::steady_clock::now();
 		
 		double frameTime = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();

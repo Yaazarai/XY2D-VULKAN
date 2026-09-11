@@ -21,7 +21,6 @@
 			std::vector<VkSemaphore> swapChainPresented = std::vector<VkSemaphore>(XY2D_BUFFERED_IMAGES);
 			VkFence swapChainAcquired = VK_NULL_HANDLE;
 			VkFence swapChainFinished = VK_NULL_HANDLE;
-			std::atomic<VkBool32> swapChainWaitRender = VK_FALSE;
 			
 			VkSurfaceFormatKHR presentFormat = { VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
 			VkSurfaceCapabilitiesKHR capabilities = {};
@@ -41,10 +40,13 @@
 					if (this->commandPool != VK_NULL_HANDLE) vkDestroyCommandPool(this->vkdevice.logicalDevice, this->commandPool, VK_NULL_HANDLE);
 					if (this->swapChain != VK_NULL_HANDLE) vkDestroySwapchainKHR(this->vkdevice.logicalDevice, this->swapChain, VK_NULL_HANDLE);
 				}));
+				
 				initialized = Initialize();
 			}
 			
 			VkResult ReCreateSwapChainImages() {
+				vkdevice.WaitDeviceIdle();
+				
 				std::vector<VkSurfaceFormatKHR> surfaceFormats;
 				xy2d_wrappers::Enumerate(surfaceFormats, vkGetPhysicalDeviceSurfaceFormatsKHR, vkdevice.physicalDevice, vkdevice.presentSurface);
 				auto findFormat = std::find_if(surfaceFormats.begin(), surfaceFormats.end(), [this](const VkSurfaceFormatKHR& format) { return this->presentFormat.colorSpace == format.colorSpace && this->presentFormat.format == format.format; });
@@ -88,6 +90,10 @@
 			}
 			
 			VkResult FrameRenderAndPresent() {
+				VkResult result = vkAcquireNextImageKHR(vkdevice.logicalDevice, swapChain, UINT64_MAX, VK_NULL_HANDLE, swapChainAcquired, &swapChainAcquiredIndex);
+				if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+					return ReCreateSwapChainImages();
+				
 				vkWaitForFences(vkdevice.logicalDevice, 1U, &swapChainAcquired, VK_TRUE, UINT64_MAX);
 				vkResetFences(vkdevice.logicalDevice, 1U, &swapChainAcquired);
 				
@@ -103,6 +109,7 @@
 				
 				vkWaitForFences(vkdevice.logicalDevice, 1U, &swapChainFinished, VK_TRUE, UINT64_MAX);
 				vkResetFences(vkdevice.logicalDevice, 1U, &swapChainFinished);
+				
 				frameTimeStamps = cmdbuffer.QueryTimeStamps();
 				vkResetQueryPool(vkdevice.logicalDevice, timestampQueryPool, 0, XY2D_TIMESTAMPS_COUNT);
 				
@@ -110,21 +117,8 @@
 				VkSemaphoreSubmitInfo signalSemaphoreInfo = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, .semaphore = swapChainPresented[swapChainAcquiredIndex] };
 				VkSubmitInfo2 queueSubmitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2, .commandBufferInfoCount = 1U, .signalSemaphoreInfoCount = 1U, .waitSemaphoreInfoCount = 0U, .pCommandBufferInfos = &cmdBufferSubmitInfo, .pSignalSemaphoreInfos = &signalSemaphoreInfo };
 				VkPresentInfoKHR presentInfo = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, .swapchainCount = 1U, .waitSemaphoreCount = 1U, .pImageIndices = &swapChainAcquiredIndex, .pSwapchains = &swapChain, .pWaitSemaphores = &swapChainPresented[swapChainAcquiredIndex] };
-				swapChainWaitRender.exchange(VK_TRUE, std::memory_order_relaxed);
 				vkQueueSubmit2(vkdevice.deviceRenderQueue, 1U, &queueSubmitInfo, swapChainFinished);
 				return vkQueuePresentKHR(vkdevice.deviceRenderQueue, &presentInfo);
-			}
-			
-			VkResult RenderSwapChain() {
-				VkResult result = vkAcquireNextImageKHR(vkdevice.logicalDevice, swapChain, UINT64_MAX, VK_NULL_HANDLE, swapChainAcquired, &swapChainAcquiredIndex);
-				if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
-					return FrameRenderAndPresent();
-				
-				if (swapChainWaitRender.load(std::memory_order_relaxed) == VK_TRUE)
-					vkWaitForFences(vkdevice.logicalDevice, 1U, &swapChainFinished, VK_TRUE, UINT64_MAX);
-				vkResetFences(vkdevice.logicalDevice, 1U, &swapChainFinished);
-				swapChainWaitRender.exchange(VK_FALSE, std::memory_order_relaxed);
-				return ReCreateSwapChainImages();
 			}
 			
 			VkResult Initialize() {
@@ -143,6 +137,7 @@
 				VkQueryPoolCreateInfo queryPoolCreateInfo = { .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP, .queryCount = XY2D_TIMESTAMPS_COUNT };
 				vkCreateQueryPool(vkdevice.logicalDevice, &queryPoolCreateInfo, VK_NULL_HANDLE, &timestampQueryPool);
 				vkResetQueryPool(vkdevice.logicalDevice, timestampQueryPool, 0, XY2D_TIMESTAMPS_COUNT);
+				
 				return ReCreateSwapChainImages();
 			}
 		};
