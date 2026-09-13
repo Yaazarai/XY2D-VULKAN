@@ -72,6 +72,7 @@
 	#include "./xy2d_cmdbuffer.hpp"
 	#include "./xy2d_renderer.hpp"
 	#include "./xy2d_sprite.hpp"
+	#include "./xy2d_camera.hpp"
 #endif
 
 /*

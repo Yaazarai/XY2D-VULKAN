@@ -11,9 +11,10 @@
 		public:
 			xy2d_invoker<> onDispose;
 			
-			bool Dispose() {
-				if (!disposed.load()) disposed.store(true);
-				return disposed.load();
+			void Dispose() {
+				if (disposed.load(std::memory_order_relaxed)) return;
+				onDispose.invoke();
+				disposed.store(true, std::memory_order_relaxed);
 			}
 		};
 	}

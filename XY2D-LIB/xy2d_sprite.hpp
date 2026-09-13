@@ -7,12 +7,12 @@
 		class xy2d_sprite {
 		public:
 			xy2d_vertex vertices[6] = {
-				{ glm::vec3(0.0, 0.0, 0.0), glm::vec2(0.0, 0.0) },
-				{ glm::vec3(1.0, 0.0, 0.0), glm::vec2(1.0, 0.0) },
-				{ glm::vec3(1.0, 1.0, 0.0), glm::vec2(1.0, 1.0) },
-				{ glm::vec3(0.0, 0.0, 0.0), glm::vec2(0.0, 0.0) },
-				{ glm::vec3(1.0, 1.0, 0.0), glm::vec2(1.0, 1.0) },
-				{ glm::vec3(0.0, 1.0, 0.0), glm::vec2(0.0, 1.0) },
+				{ glm::vec2(0.0, 0.0), glm::vec2(0.0, 0.0), glm::uint32(0xFFFFFFFFU) },
+				{ glm::vec2(1.0, 0.0), glm::vec2(1.0, 0.0), glm::uint32(0xFFFFFFFFU) },
+				{ glm::vec2(1.0, 1.0), glm::vec2(1.0, 1.0), glm::uint32(0xFFFFFFFFU) },
+				{ glm::vec2(0.0, 0.0), glm::vec2(0.0, 0.0), glm::uint32(0xFFFFFFFFU) },
+				{ glm::vec2(1.0, 1.0), glm::vec2(1.0, 1.0), glm::uint32(0xFFFFFFFFU) },
+				{ glm::vec2(0.0, 1.0), glm::vec2(0.0, 1.0), glm::uint32(0xFFFFFFFFU) },
 			};
 			
 			glm::int32_t batchIndex = -1.0;
@@ -20,12 +20,13 @@
 			glm::vec4 uvwh = glm::vec4(0.0, 0.0, 1.0, 1.0);
 			glm::vec2 xyscale = glm::vec2(1.0, 1.0);
 			glm::vec2 xyorigin = glm::vec2(0.0, 0.0);
-			glm::float32_t depth = 0.0;
-			glm::float32_t theta = 0.0;
+			glm::float32 theta = 0.0;
+			glm::float32 depth = 0.0;
+			glm::uint32 color = 0xFFFFFFFFU;
 			
 			xy2d_sprite() {};
-			xy2d_sprite(glm::vec4& xywh, glm::vec4& uvwh, glm::vec2& xyscale, glm::vec2& xyorigin, glm::float32_t& depth, glm::float32_t& theta)
-				: xywh(xywh), uvwh(uvwh), xyscale(xyscale), xyorigin(xyorigin), depth(depth), theta(theta) { Update(); };
+			xy2d_sprite(glm::vec4& xywh, glm::vec4& uvwh, glm::vec2& xyscale, glm::vec2& xyorigin, glm::float32_t& theta, glm::float32& depth, glm::uint32 color)
+				: xywh(xywh), uvwh(uvwh), xyscale(xyscale), xyorigin(xyorigin), theta(theta), depth(depth), color(color) { Update(); };
 			
 			xy2d_sprite& PosSize(glm::vec4 xywh) { this->xywh = xywh; return (*this); }
 			xy2d_sprite& Position(glm::vec2 xy) { this->xywh.x = xy.x; this->xywh.y = xy.y; return (*this); }
@@ -34,21 +35,23 @@
 			xy2d_sprite& Scale(glm::vec2 xyscale) { this->xyscale = xyscale; return (*this); }
 			xy2d_sprite& Rotate(glm::float32 theta) { this->theta = theta; return (*this); }
 			xy2d_sprite& Texture(glm::vec4 uvwh) { this->uvwh = uvwh; return (*this); }
+			xy2d_sprite& Color(glm::uint32 col) { this->color = col; return (*this); }
+			xy2d_sprite& Depth(glm::float32 dpt) { this->depth = dpt; return (*this); }
 			
 			xy2d_sprite& Update() {
-				vertices[0] = { glm::vec3(xywh.x         , xywh.y         , depth), glm::vec2(uvwh.x         , uvwh.y         ) };
-				vertices[1] = { glm::vec3(xywh.x + xywh.z, xywh.y         , depth), glm::vec2(uvwh.x + uvwh.z, uvwh.y         ) };
-				vertices[4] = { glm::vec3(xywh.x + xywh.z, xywh.y + xywh.w, depth), glm::vec2(uvwh.x + uvwh.z, uvwh.y + uvwh.w) };
-				vertices[5] = { glm::vec3(xywh.x         , xywh.y + xywh.w, depth), glm::vec2(uvwh.x         , uvwh.y + uvwh.w) };
+				vertices[0] = { glm::vec2(xywh.x         , xywh.y         ), glm::vec2(uvwh.x         , uvwh.y         ), color };
+				vertices[1] = { glm::vec2(xywh.x + xywh.z, xywh.y         ), glm::vec2(uvwh.x + uvwh.z, uvwh.y         ), color };
+				vertices[4] = { glm::vec2(xywh.x + xywh.z, xywh.y + xywh.w), glm::vec2(uvwh.x + uvwh.z, uvwh.y + uvwh.w), color };
+				vertices[5] = { glm::vec2(xywh.x         , xywh.y + xywh.w), glm::vec2(uvwh.x         , uvwh.y + uvwh.w), color };
 				
 				glm::mat2 rotmatrix = glm::mat2(glm::cos(theta), -glm::sin(theta), glm::sin(theta), glm::cos(theta));
 				
 				for(size_t i = 0, corner[4] = { 0, 1, 4, 5 }; i < std::size(corner); i++) {
-					glm::vec2 xypos = glm::vec2(vertices[corner[i]].xyz);
+					glm::vec2 xypos = glm::vec2(vertices[corner[i]].xy);
 					xypos -= glm::vec2(xywh);
-					xypos = rotmatrix * ((xypos - glm::vec2(xyorigin.x, xyorigin.y)) * xyscale);
+					xypos = rotmatrix * ((xypos - xyorigin) * xyscale);
 					xypos += glm::vec2(xywh);
-					vertices[corner[i]].xyz = glm::vec3(xypos, depth);
+					vertices[corner[i]].xy = xypos;
 				}
 				
 				vertices[2] = vertices[4], vertices[3] = vertices[0];
@@ -59,8 +62,8 @@
 				return sizeof(vertices);
 			}
 			
-			inline static xy2d_sprite CreateSprite(glm::vec4 xywh, glm::vec4 uvwh, glm::vec2 xyscale, glm::vec2 xyorigin, glm::float32_t depth, glm::float32_t theta) {
-				return xy2d_sprite(xywh, uvwh, xyscale, xyorigin, depth, theta);
+			inline static xy2d_sprite CreateSprite(glm::vec4 xywh, glm::vec4 uvwh, glm::vec2 xyscale, glm::vec2 xyorigin, glm::float32 theta, glm::float32 depth = 0.0f, glm::uint32 color = 0xFFFFFFFFU) {
+				return xy2d_sprite(xywh, uvwh, xyscale, xyorigin, theta, depth, color);
 			}
 			
 			inline static glm::vec4 GetUVCoords(glm::vec4 xywh, glm::vec2 textsize) {

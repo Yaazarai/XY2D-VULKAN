@@ -5,10 +5,6 @@ using namespace xy2d;
 #define FRAG "./Shaders/texture_output_frag.spv"
 #define VERT "./Shaders/default_output_vert.spv"
 
-struct camera_ubo {
-	glm::mat4x4 projection;
-} camera;
-
 xy2d_device* vkdevice;
 xy2d_renderer* renderer;
 xy2d_pipeline* pipeline;
@@ -30,36 +26,26 @@ xy2d_sprite present_sprite, render_sprite;
 std::thread* renderThread;
 glm::float32 theta = 0.0;
 
-glm::mat4 CameraTransform(glm::vec2 cameraSize, glm::vec2 cameraPosition, glm::vec2 cameraScale = glm::vec2(1.0f), glm::float32_t cameraTheta = 0.0f, glm::vec2 zNearFar = glm::vec2(1.0f, -1.0f)) {
-    //glm::vec2 cameraCenter = cameraSize / 2.0f;
-    glm::mat4 projection = glm::ortho(0.0f, cameraSize.x, 0.0f, cameraSize.y, zNearFar.x, zNearFar.y);
-    //projection = glm::translate(projection, glm::vec3(cameraCenter, 0.0f));
-    //projection = glm::rotate(projection, cameraTheta, glm::vec3(0.0f, 0.0f, 1.0f));
-    //projection = glm::scale(projection, glm::vec3(cameraScale, 1.0f));
-    //projection = glm::translate(projection, glm::vec3(-cameraCenter - cameraPosition, 0.0f));
-    return projection;
-}
-
 void PresentScene(xy2d_cmdbuffer* cmdbuffer, xy2d_image* swapChainImage) {
-	theta += 0.25 * 0.00125;
-	present_sprite.Rotate(theta);
+	theta += 0.00125;
+	//present_sprite.Rotate(theta);
 	glm::vec2 center = glm::vec2(xy2d_window::GetWindowWidth(), xy2d_window::GetWindowHeight());
-	present_sprite.Size(center);
-	present_sprite.Position(center * glm::vec2(0.5));
-	present_sprite.Origin(glm::vec2(render_sprite.xywh.z, render_sprite.xywh.w) / glm::vec2(2.0));
+	glm::vec2 windowSize = center;
+	//present_sprite.Size(center);
+	present_sprite.Position((windowSize - glm::vec2(present_sprite.xywh.z, present_sprite.xywh.w)) * glm::vec2(0.5));
+	//present_sprite.Origin(glm::vec2(640.0, 480.0) * glm::vec2(0.5));
+	//present_sprite.Update();
 	present_sprite.Update();
-	
 	/*
 		NOTE: Buffer / Image memory is shared PER-RENDER-PASS due to using only one command buffer.
 		So if you want separate camera/vertex transforms, etc. you need a unique STAGING buffer per render pass.
 	*/
-	glm::vec2 windowSize = center;
 	
-	glm::mat4 cameraData1 = CameraTransform(glm::vec2(640.0, 480.0), glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0));
-	cmdbuffer->TransferBufferEXT(&cameraData1, sizeof(glm::mat4), 0U, stage_buffer, camera_buffer1);
+	xy2d_camera cameraData1 = xy2d_camera::GetCamera(glm::vec2(sampler_image->width, sampler_image->height), glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0), glm::vec2(0.0, 0.0), 0.0);
+	cmdbuffer->TransferBufferEXT(&cameraData1, sizeof(xy2d_camera), 0U, stage_buffer, camera_buffer1);
 	
-	cmdbuffer->TransferBufferEXT(render_sprite.vertices, render_sprite.SizeOf(), sizeof(glm::mat4) + sizeof(glm::mat4), stage_buffer, vertex_buffer, 0U);
-	cmdbuffer->TransferBufferEXT(present_sprite.vertices, present_sprite.SizeOf(), sizeof(glm::mat4) + sizeof(glm::mat4) + render_sprite.SizeOf(), stage_buffer, vertex_buffer, render_sprite.SizeOf());
+	cmdbuffer->TransferBufferEXT(render_sprite.vertices, render_sprite.SizeOf(), sizeof(xy2d_camera) + sizeof(xy2d_camera), stage_buffer, vertex_buffer, 0U);
+	cmdbuffer->TransferBufferEXT(present_sprite.vertices, present_sprite.SizeOf(), sizeof(xy2d_camera) + sizeof(xy2d_camera) + render_sprite.SizeOf(), stage_buffer, vertex_buffer, render_sprite.SizeOf());
 	
 	cmdbuffer->RenderBegin(pipeline_uv, { sampler_image }, { 0U, 0U, sampler_image->width, sampler_image->height });
 	cmdbuffer->RenderPushBuffer(pipeline_uv, camera_buffer1, 0);
@@ -67,11 +53,11 @@ void PresentScene(xy2d_cmdbuffer* cmdbuffer, xy2d_image* swapChainImage) {
 	cmdbuffer->RenderDrawVertices(6, 0, 1);
 	cmdbuffer->RenderEnd();
 	
-	glm::mat4 cameraData2 = CameraTransform(windowSize, glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0), theta);
-	cmdbuffer->TransferBufferEXT(&cameraData2, sizeof(glm::mat4), 0U, stage_buffer, camera_buffer1);
+	xy2d_camera cameraData2 = xy2d_camera::GetCamera(windowSize, glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0), windowSize * glm::vec2(0.5), theta);
+	cmdbuffer->TransferBufferEXT(&cameraData2, sizeof(xy2d_camera), sizeof(xy2d_camera), stage_buffer, camera_buffer2);
 	
 	cmdbuffer->RenderBegin(pipeline, { swapChainImage }, { 0U, 0U, swapChainImage->width, swapChainImage->height });
-	cmdbuffer->RenderPushBuffer(pipeline, camera_buffer1, 0);
+	cmdbuffer->RenderPushBuffer(pipeline, camera_buffer2, 0);
 	cmdbuffer->RenderPushImageSampler(pipeline, sampler_image, 1);
 	cmdbuffer->RenderBindVertexBuffer(vertex_buffer);
 	cmdbuffer->RenderDrawVertices(6, 6, 1);
@@ -100,6 +86,7 @@ void RenderScene() {
 }
 
 void xy2d_window::WindowAppInit() {
+	std::cout << "SIZEOF VERTEX: " << sizeof(xy2d_vertex) << std::endl;
 	vkdevice = new xy2d_device();
 	renderer = new xy2d_renderer(*vkdevice);
 	vert_shader = new xy2d_shader(VERT, XY2D_SHADERSTAGE::VERTEX, { XY2D_DESCRIPTORS::UBO });
@@ -109,16 +96,18 @@ void xy2d_window::WindowAppInit() {
 	pipeline = new xy2d_pipeline(*vkdevice, { *vert_shader, *frag_shader, });
 	pipeline_uv = new xy2d_pipeline(*vkdevice, { *vert_shader, *uvfrag_shader, });
 	
-	stage_buffer = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::STAGING, static_cast<VkDeviceSize>(sizeof(glm::mat4) + sizeof(glm::mat4) + render_sprite.SizeOf() + present_sprite.SizeOf()));
+	stage_buffer = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::STAGING, static_cast<VkDeviceSize>(sizeof(xy2d_camera) + sizeof(xy2d_camera) + render_sprite.SizeOf() + present_sprite.SizeOf()));
 	vertex_buffer = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::VERTEX, static_cast<VkDeviceSize>(present_sprite.SizeOf() * 4));
-	camera_buffer1 = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::UNIFORM, static_cast<VkDeviceSize>(sizeof(glm::mat4)));
-	camera_buffer2 = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::UNIFORM, static_cast<VkDeviceSize>(sizeof(glm::mat4)));
+	camera_buffer1 = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::UNIFORM, static_cast<VkDeviceSize>(sizeof(xy2d_camera)));
+	camera_buffer2 = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::UNIFORM, static_cast<VkDeviceSize>(sizeof(xy2d_camera)));
 	
 	sampler_image = new xy2d_image(*vkdevice, XY2D_IMAGETYPE::ATTACHEMENT, 640, 480);
 	
 	render_sprite = xy2d_sprite();
 	present_sprite = xy2d_sprite();
 	
+	render_sprite.Color(0xFFFFFFFFU);
+	present_sprite.Color(0xFFFFFFFFU);
 	render_sprite.Size(glm::vec2(640.0, 480.0));
 	render_sprite.Update();
 	present_sprite.Size(glm::vec2(640.0, 480.0));
@@ -134,6 +123,7 @@ void xy2d_window::WindowAppInit() {
 			delete renderThread;
 		}
 		
+		vkdevice->WaitDeviceIdle();
 		delete camera_buffer1;
 		delete camera_buffer2;
 		delete sampler_image;

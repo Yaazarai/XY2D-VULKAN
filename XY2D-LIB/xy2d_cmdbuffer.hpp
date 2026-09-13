@@ -20,8 +20,9 @@
 		
 		struct xy2d_vertex {
 		public:
-			glm::vec3 xyz;
+			glm::vec2 xy;
 			glm::vec2 txcoord;
+			glm::uint color;
 			
 			static const VkVertexInputBindingDescription2EXT GetBindingDescription() {
 				return { .sType = VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, .binding = 0, .stride = sizeof(xy2d_vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX, .divisor = 1, .pNext = VK_NULL_HANDLE };
@@ -29,8 +30,9 @@
 			
 			static const std::vector<VkVertexInputAttributeDescription2EXT> GetAttributeDescriptions() {
 				return {
-					{ .sType = VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT, .pNext = VK_NULL_HANDLE, .binding = 0, .location = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(xy2d_vertex, xyz) },
+					{ .sType = VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT, .pNext = VK_NULL_HANDLE, .binding = 0, .location = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(xy2d_vertex, xy) },
 					{ .sType = VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT, .pNext = VK_NULL_HANDLE, .binding = 0, .location = 1, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(xy2d_vertex, txcoord) },
+					{ .sType = VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT, .pNext = VK_NULL_HANDLE, .binding = 0, .location = 2, .format = VK_FORMAT_R32_UINT, .offset = offsetof(xy2d_vertex, color) },
 				};
 			}
 		};

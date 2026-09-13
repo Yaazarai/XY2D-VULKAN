@@ -39,13 +39,11 @@
 			xy2d_image(xy2d_device& vkdevice, const XY2D_IMAGETYPE sourceType, uint32_t width, uint32_t height, VkFormat rgbaFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VkBool32 lerpFilter = false, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageView = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE)
 			: vkdevice(vkdevice), sourceType(sourceType), width(width), height(height), rgbaFormat(rgbaFormat), colorWriteMask(xy2d_wrappers::GetColorComponentFlags(rgbaFormat)), addressMode(addressMode), lerpFilter(lerpFilter), imageLayout(XY2D_IMAGELAYOUT::UNINITIALIZED), imageSource(imageSource), imageView(imageView), imageSampler(imageSampler) {
 				onDispose.hook(xy2d_callback<>([this]() {
-					if (this->sourceType != XY2D_IMAGETYPE::SWAPCHAIN) {
-						if (this->imageSampler != VK_NULL_HANDLE) vkDestroySampler(this->vkdevice.logicalDevice, this->imageSampler, VK_NULL_HANDLE);
-						if (this->imageView != VK_NULL_HANDLE) vkDestroyImageView(this->vkdevice.logicalDevice, this->imageView, VK_NULL_HANDLE);
+					if (this->sourceType != XY2D_IMAGETYPE::SWAPCHAIN)
 						if (this->imageSource != VK_NULL_HANDLE) vmaDestroyImage(this->vkdevice.memoryAllocator, this->imageSource, imageMemory);
-					} else {
-						if (this->imageView != VK_NULL_HANDLE) vkDestroyImageView(this->vkdevice.logicalDevice, this->imageView, VK_NULL_HANDLE);
-					}
+					
+					if (this->imageSampler != VK_NULL_HANDLE) vkDestroySampler(this->vkdevice.logicalDevice, this->imageSampler, VK_NULL_HANDLE);
+					if (this->imageView != VK_NULL_HANDLE) vkDestroyImageView(this->vkdevice.logicalDevice, this->imageView, VK_NULL_HANDLE);
 				}));
 				initialized = Initialize();
 			}
@@ -73,7 +71,8 @@
 				VkSamplerCreateInfo imageSamplerInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .magFilter = VK_FILTER_NEAREST, .minFilter = VK_FILTER_NEAREST, .anisotropyEnable = VK_FALSE, .compareEnable = VK_FALSE, .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK, .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .unnormalizedCoordinates = VK_FALSE, .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR, .minLod = 0.0f, .maxLod = VK_LOD_CLAMP_NONE };
 				imageSamplerInfo.addressModeU = imageSamplerInfo.addressModeV = imageSamplerInfo.addressModeW = addressMode;
 				imageSamplerInfo.mipmapMode = (lerpFilter)? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
-				vkCreateSampler(vkdevice.logicalDevice, &imageSamplerInfo, VK_NULL_HANDLE, &imageSampler);
+				VkResult result = vkCreateSampler(vkdevice.logicalDevice, &imageSamplerInfo, VK_NULL_HANDLE, &imageSampler);
+				if (result != VK_SUCCESS) return result;
 				
 				VkImageViewCreateInfo imageViewCreateInfo = { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, .viewType = VK_IMAGE_VIEW_TYPE_2D, .components = { VK_COMPONENT_SWIZZLE_IDENTITY }, .subresourceRange = { .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1, .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT } };
 				imageViewCreateInfo.image = imageSource;

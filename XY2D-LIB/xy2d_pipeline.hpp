@@ -7,7 +7,6 @@
 		class xy2d_pipeline : xy2d_disposable {
 		public:
 			xy2d_device& vkdevice;
-			
 			VkDescriptorSetLayout descriptorLayout;
 			VkPipelineLayout pipelineLayout;
 			std::vector<xy2d_shader> shaderSources;
@@ -24,6 +23,7 @@
 					for(VkShaderEXT shaderObject : this->shaderObjects)
 						vkDestroyShaderEXTXY2D(this->vkdevice.logicalDevice, shaderObject, VK_NULL_HANDLE);
 					if (this->descriptorLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(this->vkdevice.logicalDevice, this->descriptorLayout, VK_NULL_HANDLE);
+					if (this->pipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(this->vkdevice.logicalDevice, this->pipelineLayout, VK_NULL_HANDLE);
 				}));
 				initialized = Initialize();
 			}
