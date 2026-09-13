@@ -51,7 +51,7 @@ void PresentScene(xy2d_cmdbuffer* cmdbuffer, xy2d_image* swapChainImage) {
 	
 	/*
 		NOTE: Buffer / Image memory is shared PER-RENDER-PASS due to using only one command buffer.
-		So if you want separate camera transforms, etc. you need a unique UBO per render pass.
+		So if you want separate camera/vertex transforms, etc. you need a unique STAGING buffer per render pass.
 	*/
 	glm::vec2 windowSize = center;
 	
@@ -61,7 +61,6 @@ void PresentScene(xy2d_cmdbuffer* cmdbuffer, xy2d_image* swapChainImage) {
 	cmdbuffer->TransferBufferEXT(render_sprite.vertices, render_sprite.SizeOf(), sizeof(glm::mat4) + sizeof(glm::mat4), stage_buffer, vertex_buffer, 0U);
 	cmdbuffer->TransferBufferEXT(present_sprite.vertices, present_sprite.SizeOf(), sizeof(glm::mat4) + sizeof(glm::mat4) + render_sprite.SizeOf(), stage_buffer, vertex_buffer, render_sprite.SizeOf());
 	
-	cmdbuffer->ExecutionBarrier(XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, { sampler_image });
 	cmdbuffer->RenderBegin(pipeline_uv, { sampler_image }, { 0U, 0U, sampler_image->width, sampler_image->height });
 	cmdbuffer->RenderPushBuffer(pipeline_uv, camera_buffer1, 0);
 	cmdbuffer->RenderBindVertexBuffer(vertex_buffer);
@@ -71,7 +70,6 @@ void PresentScene(xy2d_cmdbuffer* cmdbuffer, xy2d_image* swapChainImage) {
 	glm::mat4 cameraData2 = CameraTransform(windowSize, glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0), theta);
 	cmdbuffer->TransferBufferEXT(&cameraData2, sizeof(glm::mat4), 0U, stage_buffer, camera_buffer1);
 	
-	cmdbuffer->ExecutionBarrier(XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, { sampler_image });
 	cmdbuffer->RenderBegin(pipeline, { swapChainImage }, { 0U, 0U, swapChainImage->width, swapChainImage->height });
 	cmdbuffer->RenderPushBuffer(pipeline, camera_buffer1, 0);
 	cmdbuffer->RenderPushImageSampler(pipeline, sampler_image, 1);

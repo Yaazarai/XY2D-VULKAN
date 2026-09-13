@@ -2,9 +2,15 @@
 #ifndef __XY2D_ENGINE
 #define __XY2D_ENGINE
 
-    #define GLM_FORCE_RADIANS
-    #define GLM_FORCE_LEFT_HANDED
-    #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+	#ifdef _DEBUG
+		#define XY2D_VALIDATION true
+	#else
+		#define XY2D_VALIDATION false
+	#endif
+	
+	#define GLM_FORCE_RADIANS
+	#define GLM_FORCE_LEFT_HANDED
+	#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 	#include <glm/glm.hpp>
 	#include <glm/ext.hpp>
 	
@@ -16,18 +22,12 @@
 	#define VMA_IMPLEMENTATION
 	#define VMA_DEBUG_GLOBAL_MUTEX VK_TRUE
 	#define VMA_USE_STL_CONTAINERS VK_TRUE
-	#define VMA_RECORDING_ENABLED XYVK_VALIDATION
+	#define VMA_RECORDING_ENABLED (!XY2D_VALIDATION)
 	#include <vma/vk_mem_alloc.h>
 	
 	#include <vulkan/vulkan.h>
 	#include <vulkan/vulkan.hpp>
 	#include <vulkan/utility/vk_format_utils.h>
-	
-	#ifdef _DEBUG
-		#define XY2D_VALIDATION true
-	#else
-		#define XY2D_VALIDATION false
-	#endif
 	
 	#ifndef XY2D_NAMESPACE
 		#define XY2D_NAMESPACE xy2d
