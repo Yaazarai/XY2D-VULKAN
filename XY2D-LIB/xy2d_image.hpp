@@ -45,6 +45,7 @@
 					if (this->imageSampler != VK_NULL_HANDLE) vkDestroySampler(this->vkdevice.logicalDevice, this->imageSampler, VK_NULL_HANDLE);
 					if (this->imageView != VK_NULL_HANDLE) vkDestroyImageView(this->vkdevice.logicalDevice, this->imageView, VK_NULL_HANDLE);
 				}));
+				
 				initialized = Initialize();
 			}
 			

@@ -211,6 +211,7 @@
 			
 			void ComputeBegin(xy2d_pipeline* pipeline) {
 				ExecutionBarrier(XY2D_PIPELINESTAGES::COMPUTE, XY2D_ACCESSSTAGES::COMPUTE, {});
+				
 				vkCmdBindShadersEXTXY2D(cmdbuffer, pipeline->shaderStages.size(), reinterpret_cast<VkShaderStageFlagBits*>(pipeline->shaderStages.data()), pipeline->shaderObjects.data());
 			}
 			
@@ -275,9 +276,6 @@
 				
 				void* stagedOffset = static_cast<int8_t*>(stageBuffer->description.pMappedData) + offsetOfData;
 				SDL_memcpy(stagedOffset, dataPointer, sizeOfData);
-				
-				VkExtent3D copyExtent = { .width = width, .height = height, .depth = 1U };
-				VkOffset3D copyOffset = { .x = static_cast<int32_t>(xpos), .y = static_cast<int32_t>(ypos), .z = 0 };
 				
 				VkBufferImageCopy copyRegion = {};
 				copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;

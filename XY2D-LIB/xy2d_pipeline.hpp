@@ -7,8 +7,9 @@
 		class xy2d_pipeline : xy2d_disposable {
 		public:
 			xy2d_device& vkdevice;
-			VkDescriptorSetLayout descriptorLayout;
-			VkPipelineLayout pipelineLayout;
+			xy2d_buffer* stagingBuffer = VK_NULL_HANDLE;
+			VkDescriptorSetLayout descriptorLayout = VK_NULL_HANDLE;
+			VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 			std::vector<xy2d_shader> shaderSources;
 			std::vector<VkShaderEXT> shaderObjects;
 			std::vector<XY2D_SHADERSTAGE> shaderStages;
@@ -18,13 +19,17 @@
 			xy2d_pipeline(const xy2d_pipeline&) = delete;
 			~xy2d_pipeline() { this->Dispose(); }
 			
-			xy2d_pipeline(xy2d_device& vkdevice, std::vector<xy2d_shader> shaderSources) : vkdevice(vkdevice), shaderSources(shaderSources), descriptorLayout(VK_NULL_HANDLE) {
+			xy2d_pipeline(xy2d_device& vkdevice, std::vector<xy2d_shader> shaderSources, VkDeviceSize stageBufferSize = 0U) : vkdevice(vkdevice), shaderSources(shaderSources), descriptorLayout(VK_NULL_HANDLE) {
 				onDispose.hook(xy2d_callback<>([this]() {
 					for(VkShaderEXT shaderObject : this->shaderObjects)
 						vkDestroyShaderEXTXY2D(this->vkdevice.logicalDevice, shaderObject, VK_NULL_HANDLE);
 					if (this->descriptorLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(this->vkdevice.logicalDevice, this->descriptorLayout, VK_NULL_HANDLE);
 					if (this->pipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(this->vkdevice.logicalDevice, this->pipelineLayout, VK_NULL_HANDLE);
+					if (this->stagingBuffer != VK_NULL_HANDLE) delete stagingBuffer;
 				}));
+				
+				if (stageBufferSize > 0U)
+					stagingBuffer = new xy2d_buffer(vkdevice, XY2D_BUFFERTYPE::STAGING, stageBufferSize);
 				initialized = Initialize();
 			}
 			
