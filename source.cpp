@@ -56,9 +56,8 @@ void RenderScene() {
 	
 	while(!xy2d_window::GetWindowCloseRequest()) {
 		renderer->FrameRenderAndPresent();
-		double frameSpan = 1000.0 / 240.0;
-		std::cout << "FRAME: [" << frameIndex << "] : " << ((renderer->frameTimeStamps[1] - framePrevious) - frameSpan) << std::endl;
-		framePrevious = renderer->frameTimeStamps[0];
+		std::cout << "FRAME: [" << frameIndex << "] : " << (renderer->frameTimeStamps[0]- framePrevious) << std::endl;
+		framePrevious = renderer->frameTimeStamps.back();
 		frameIndex ++;
 	}
 }
