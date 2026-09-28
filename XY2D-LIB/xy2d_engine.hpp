@@ -1,7 +1,6 @@
 #pragma once
 #ifndef __XY2D_ENGINE
 #define __XY2D_ENGINE
-
 	#ifdef _DEBUG
 		#define XY2D_VALIDATION true
 	#else
@@ -25,19 +24,13 @@
 	#define VMA_RECORDING_ENABLED (!XY2D_VALIDATION)
 	#include <vma/vk_mem_alloc.h>
 	
-	#include <vulkan/vulkan.h>
-	#include <vulkan/vulkan.hpp>
-	#include <vulkan/utility/vk_format_utils.h>
-	
-	#ifndef XY2D_NAMESPACE
-		#define XY2D_NAMESPACE xy2d
-		namespace XY2D_NAMESPACE {}
-	#endif
-	
 	#define VKERROR(resvar, result) ((resvar == VK_SUCCESS)? result : resvar)
 	#define VK_LAYER_KHRONOS_EXTENSION_NAME "VK_LAYER_KHRONOS_validation"
 	#define XY2D_ENGINE_VERSION VK_API_VERSION_1_4
 	#define XY2D_ENGINE_NAME "XY2D_ENGINE"
+	#include <vulkan/vulkan.h>
+	#include <vulkan/vulkan.hpp>
+	#include <vulkan/utility/vk_format_utils.h>
 	
 	#ifndef XY2D_BUFFERED_IMAGES
 		#define XY2D_BUFFERED_IMAGES 3U
@@ -60,19 +53,15 @@
 	#include <utility>
 	#include <mutex>
 	
+	#include "./xy2d_window.hpp"
 	#include "./xy2d_wrappers.hpp"
 	#include "./xy2d_callback.hpp"
-	#include "./xy2d_disposable.hpp"
-	#include "./xy2d_window.hpp"
 	#include "./xy2d_device.hpp"
-	#include "./xy2d_buffer.hpp"
-	#include "./xy2d_image.hpp"
-	#include "./xy2d_shader.hpp"
-	#include "./xy2d_pipeline.hpp"
+	#include "./xy2d_gpualloc.hpp"
+	#include "./xy2d_shaderpipe.hpp"
 	#include "./xy2d_cmdbuffer.hpp"
 	#include "./xy2d_renderer.hpp"
 	#include "./xy2d_sprite.hpp"
-	#include "./xy2d_camera.hpp"
 #endif
 
 /*

@@ -1,106 +1,132 @@
 #include ".\XY2D-LIB\xy2d_engine.hpp"
-using namespace xy2d;
 
-#define UVFRAG "./Shaders/uvout_frag.spv"
+#define LHRC "./Shaders/linespace_output_frag.spv"
+#define SCNE "./Shaders/scene_output_frag.spv"
 #define FRAG "./Shaders/texture_output_frag.spv"
 #define VERT "./Shaders/default_output_vert.spv"
+#define CASCADE_WIDTH 256
+#define CASCADE_COUNT 9
 
-xy2d_device* vkdevice;
-xy2d_renderer* renderer;
-xy2d_pipeline* pipeline;
-xy2d_pipeline* pipeline_uv;
-xy2d_buffer* vertex_buffer;
-xy2d_buffer* camera_buffer;
-xy2d_image* sampler_image;
+xy2d_device vkdevice = {};
+xy2d_renderer renderer = {};
+xy2d_shader vertex_shader = {};
+xy2d_shader scene_shader = {};
+xy2d_shader linespace_shader = {};
+xy2d_shader fragment_shader = {};
+xy2d_shaderpipe pipeline_scne = {};
+xy2d_shaderpipe pipeline_lhrc = {};
+xy2d_shaderpipe pipeline_pres = {};
+xy2d_gpualloc vertex_buffer = {};
+xy2d_gpualloc camera_buffer = {};
+xy2d_gpualloc sampler_image = {};
+xy2d_gpualloc cascade_images[CASCADE_COUNT];
 
-xy2d_sprite present_sprite, render_sprite;
+xy2d_sprite render_sprite = {};
+xy2d_sprite present_sprite = {};
 
 std::thread* renderThread;
-glm::float32 theta = 0.0;
 
-void PresentScene(xy2d_cmdbuffer* cmdbuffer, xy2d_image* swapChainImage) {
-	theta += 0.00125;
-	glm::vec2 windowSize = glm::vec2(xy2d_window::GetWindowWidth(), xy2d_window::GetWindowHeight());
-	present_sprite.Position((windowSize - glm::vec2(present_sprite.xywh.z, present_sprite.xywh.w)) * glm::vec2(0.5));
-	present_sprite.Update();
-	/*
-		NOTE: Buffer / Image memory is shared PER-RENDER-PASS due to using only one command buffer.
-		So if you want separate camera/vertex transforms, etc. you need a unique STAGING buffer per render pass.
-	*/
+void xy2d_window_quit(void* appstate, SDL_AppResult result) {
+	if (renderThread != VK_NULL_HANDLE) {
+		renderThread->join();
+		delete renderThread;
+	}
 	
-	xy2d_camera cameraData1 = xy2d_camera::GetCamera(glm::vec2(sampler_image->width, sampler_image->height), glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0), glm::vec2(0.0, 0.0), 0.0);
-	cmdbuffer->TransferBufferEXT(&cameraData1, sizeof(xy2d_camera), 0U, pipeline_uv->stagingBuffer, camera_buffer);
-	cmdbuffer->TransferBufferEXT(render_sprite.vertices, render_sprite.SizeOf(), sizeof(xy2d_camera), pipeline_uv->stagingBuffer, vertex_buffer, 0U);
-	
-	cmdbuffer->RenderBegin(pipeline_uv, { sampler_image }, { 0U, 0U, sampler_image->width, sampler_image->height });
-	cmdbuffer->RenderPushBuffer(pipeline_uv, camera_buffer, 0);
-	cmdbuffer->RenderBindVertexBuffer(vertex_buffer);
-	cmdbuffer->RenderDrawVertices(6, 0, 1);
-	cmdbuffer->RenderEnd();
-	
-	xy2d_camera cameraData2 = xy2d_camera::GetCamera(windowSize, glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0), windowSize * glm::vec2(0.5), theta);
-	cmdbuffer->TransferBufferEXT(&cameraData2, sizeof(xy2d_camera), 0U, pipeline->stagingBuffer, camera_buffer);
-	cmdbuffer->TransferBufferEXT(present_sprite.vertices, present_sprite.SizeOf(), sizeof(xy2d_camera), pipeline->stagingBuffer, vertex_buffer, render_sprite.SizeOf());
-	
-	cmdbuffer->RenderBegin(pipeline, { swapChainImage }, { 0U, 0U, swapChainImage->width, swapChainImage->height });
-	cmdbuffer->RenderPushBuffer(pipeline, camera_buffer, 0);
-	cmdbuffer->RenderPushImageSampler(pipeline, sampler_image, 1);
-	cmdbuffer->RenderBindVertexBuffer(vertex_buffer);
-	cmdbuffer->RenderDrawVertices(6, 6, 1);
-	cmdbuffer->RenderEnd();
+	vkDeviceWaitIdle(vkdevice.logical);
+	xy2d_renderer_destroy(renderer);
+	xy2d_shaderpipe_destroy(pipeline_scne);
+	xy2d_shaderpipe_destroy(pipeline_lhrc);
+	xy2d_shaderpipe_destroy(pipeline_pres);
+	xy2d_gpualloc_destroy(vertex_buffer);
+	xy2d_gpualloc_destroy(camera_buffer);
+	xy2d_gpualloc_destroy(sampler_image);
+	for(int i = 0; i < CASCADE_COUNT; i++)
+		xy2d_gpualloc_destroy(cascade_images[i]);
+	xy2d_device_destroy(vkdevice);
 }
 
-void RenderScene() {
+void PresentScene(xy2d_cmdbuffer& cmdbuffer, xy2d_gpualloc& swapChainImage) {
+	glm::vec2 windowSize = glm::vec2(window.width.load(), window.height.load());
+	
+	xy2d_camera cameraData = xy2d_camera_orthographic(glm::vec2(sampler_image.length.width, sampler_image.length.height), glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0), glm::vec2(0.0, 0.0));
+	xy2d_transfer_buffer(cmdbuffer, &cameraData, sizeof(xy2d_camera), 0U, &pipeline_scne.stagingBuffer, &camera_buffer);
+	xy2d_transfer_buffer(cmdbuffer, render_sprite.vertices, xy2d_sprite_sizeof(), sizeof(xy2d_camera), &pipeline_scne.stagingBuffer, &vertex_buffer, 0U);
+	
+	xy2d_render_begin(cmdbuffer, pipeline_scne, { &sampler_image }, { 0U, 0U, sampler_image.length.width, sampler_image.length.height });
+	xy2d_shader_bind_uniforms(cmdbuffer, pipeline_scne, { &camera_buffer, &sampler_image });
+	xy2d_render_bind_vertex_buffer(cmdbuffer, &vertex_buffer);
+	xy2d_render_draw_vertex_buffer(cmdbuffer, 6, 0, 1);
+	xy2d_render_end(cmdbuffer);
+	
+	cameraData = xy2d_camera_orthographic(glm::vec2(cascade_images[0].length.width, cascade_images[0].length.height), glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0), glm::vec2(0.0, 0.0));
+	xy2d_transfer_buffer(cmdbuffer, &cameraData, sizeof(xy2d_camera), 0U, &pipeline_lhrc.stagingBuffer, &camera_buffer);
+	xy2d_transfer_buffer(cmdbuffer, render_sprite.vertices, xy2d_sprite_sizeof(), sizeof(xy2d_camera), &pipeline_lhrc.stagingBuffer, &vertex_buffer, 0U);
+	xy2d_cmdbuffer_barrier(cmdbuffer, XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, { &cascade_images[0] });
+	
+	for(int i = (CASCADE_COUNT - 1); i >= 0; i--) {
+		int n = (i + 1) % CASCADE_COUNT;
+		xy2d_render_begin(cmdbuffer, pipeline_lhrc, { &cascade_images[i] }, { 0U, 0U, cascade_images[i].length.width, cascade_images[i].length.height });
+		xy2d_shader_bind_uniforms(cmdbuffer, pipeline_lhrc, { &camera_buffer, &cascade_images[i], &cascade_images[n] });
+		xy2d_render_bind_vertex_buffer(cmdbuffer, &vertex_buffer);
+		xy2d_render_draw_vertex_buffer(cmdbuffer, 6, 0, 1);
+		xy2d_render_end(cmdbuffer);
+	}
+	
+	cameraData = xy2d_camera_orthographic(windowSize, glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0), glm::vec2(0.0, 0.0));
+	xy2d_transfer_buffer(cmdbuffer, &cameraData, sizeof(xy2d_camera), 0U, &pipeline_pres.stagingBuffer, &camera_buffer);
+	xy2d_transfer_buffer(cmdbuffer, present_sprite.vertices, xy2d_sprite_sizeof(), sizeof(xy2d_camera), &pipeline_pres.stagingBuffer, &vertex_buffer, 0U);
+	
+	xy2d_render_begin(cmdbuffer, pipeline_pres, { &swapChainImage }, { 0U, 0U, swapChainImage.length.width, swapChainImage.length.height });
+	xy2d_shader_bind_uniforms(cmdbuffer, pipeline_pres, { &camera_buffer, &cascade_images[0] });
+	xy2d_render_bind_vertex_buffer(cmdbuffer, &vertex_buffer);
+	xy2d_render_draw_vertex_buffer(cmdbuffer, 6, 0, 1);
+	xy2d_render_end(cmdbuffer);
+}
+
+void render_scene() {
 	uint32_t frameIndex = 0U;
 	double framePrevious = 0.0;
 	
-	while(!xy2d_window::GetWindowCloseRequest()) {
-		renderer->FrameRenderAndPresent();
-		std::cout << "FRAME: [" << frameIndex << "] : " << (renderer->frameTimeStamps[0]- framePrevious) << std::endl;
-		framePrevious = renderer->frameTimeStamps.back();
+	while(window.openState.load(std::memory_order_relaxed)) {
+		VkResult result = xy2d_renderer_frame_present(renderer);
+		std::cout << "FRAME: [" << frameIndex << "] : " << (renderer.frameTimeStamps[0]- framePrevious) << " : " << result << std::endl;
+		framePrevious = renderer.frameTimeStamps.back();
 		frameIndex ++;
 	}
 }
 
-void xy2d_window::WindowAppInit() {
-	xy2d_shader vert_shader = xy2d_shader(VERT, XY2D_SHADERSTAGE::VERTEX, { XY2D_DESCRIPTORS::UBO });
-	xy2d_shader frag_shader = xy2d_shader(FRAG, XY2D_SHADERSTAGE::FRAGMENT, { XY2D_DESCRIPTORS::SAMPLER });
-	xy2d_shader uvfrag_shader = xy2d_shader(UVFRAG, XY2D_SHADERSTAGE::FRAGMENT, {});
+void xy2d_window_init() {
+	SDL_SetWindowSize(window.handle, 1024, 1024);
+	vertex_shader = xy2d_shader_create(VERT, XY2D_SHADER_STAGE::VERTEX, { XY2D_SHADER_UNIFORM::UBO });
+	fragment_shader = xy2d_shader_create(FRAG, XY2D_SHADER_STAGE::FRAGMENT, { XY2D_SHADER_UNIFORM::SAMPLER });
+	linespace_shader = xy2d_shader_create(LHRC, XY2D_SHADER_STAGE::FRAGMENT, { XY2D_SHADER_UNIFORM::SAMPLER, XY2D_SHADER_UNIFORM::SAMPLER });
+	scene_shader = xy2d_shader_create(SCNE, XY2D_SHADER_STAGE::FRAGMENT, { XY2D_SHADER_UNIFORM::SAMPLER });
 	
-	vkdevice = new xy2d_device();
-	renderer = new xy2d_renderer(*vkdevice);
-	pipeline = new xy2d_pipeline(*vkdevice, { vert_shader, frag_shader, }, static_cast<VkDeviceSize>(sizeof(xy2d_camera) + render_sprite.SizeOf()));
-	pipeline_uv = new xy2d_pipeline(*vkdevice, { vert_shader, uvfrag_shader, }, static_cast<VkDeviceSize>(sizeof(xy2d_camera) + present_sprite.SizeOf()));
-	vertex_buffer = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::VERTEX, static_cast<VkDeviceSize>(present_sprite.SizeOf() * 4));
-	camera_buffer = new xy2d_buffer(*vkdevice, XY2D_BUFFERTYPE::UNIFORM, static_cast<VkDeviceSize>(sizeof(xy2d_camera)));
-	sampler_image = new xy2d_image(*vkdevice, XY2D_IMAGETYPE::ATTACHEMENT, 640, 480);
+	vkdevice = xy2d_device_create();
+	renderer = xy2d_renderer_create(vkdevice);
+	pipeline_scne = xy2d_shaderpipe_create(vkdevice, { vertex_shader, scene_shader }, 1024U);
+	pipeline_lhrc = xy2d_shaderpipe_create(vkdevice, { vertex_shader, linespace_shader }, 1024U);
+	pipeline_pres = xy2d_shaderpipe_create(vkdevice, { vertex_shader, fragment_shader }, 1024U);
 	
-	render_sprite = xy2d_sprite();
-	present_sprite = xy2d_sprite();
+	vertex_buffer = xy2d_gpualloc_create(vkdevice, XY2D_GPUALLOC_TYPE::VERTEX, { static_cast<uint32_t>(xy2d_sprite_sizeof()) * 4U, 0U });
+	camera_buffer = xy2d_gpualloc_create(vkdevice, XY2D_GPUALLOC_TYPE::UNIFORM, { sizeof(xy2d_camera), 0U });
 	
-	render_sprite.Color(0xFFFFFFFFU);
-	present_sprite.Color(0xFFFFFFFFU);
-	render_sprite.Size(glm::vec2(640.0, 480.0));
-	render_sprite.Update();
-	present_sprite.Size(glm::vec2(640.0, 480.0));
-	present_sprite.Update();
+	render_sprite = xy2d_sprite_create({0.0, 0.0, (float)CASCADE_WIDTH, (float)CASCADE_WIDTH}, {0.0, 0.0, 1.0, 1.0}, {1.0, 1.0}, {0.0, 0.0});
+	present_sprite = xy2d_sprite_create({0.0, 0.0, 1024.0, 1024.0}, {0.0, 0.0, 1.0, 1.0}, {1.0, 1.0}, {0.0, 0.0});
 	
-	renderer->renderEvent.hook(xy2d_callback<xy2d_cmdbuffer*, xy2d_image*>(PresentScene));
-	renderThread = new std::thread([](){ RenderScene(); });
+	xy2d_sprite_size(render_sprite, {256.0f, 256.0f});
+	xy2d_sprite_update(render_sprite);
+	xy2d_sprite_size(present_sprite, {1024.0f, 1024.0f});
+	xy2d_sprite_update(present_sprite);
 	
-	xy2d_window::onAppQuit.hook(xy2d_callback<>([&](){
-		if (renderThread != VK_NULL_HANDLE) {
-			renderThread->join();
-			delete renderThread;
-		}
-		
-		vkdevice->WaitDeviceIdle();
-		delete camera_buffer;
-		delete sampler_image;
-		delete vertex_buffer;
-		delete renderer;
-		delete pipeline;
-		delete pipeline_uv;
-		delete vkdevice;
-	}));
+	sampler_image = xy2d_gpualloc_create(vkdevice, XY2D_GPUALLOC_TYPE::ATTACHEMENT, {CASCADE_WIDTH, CASCADE_WIDTH});
+	for(int i = 0; i < CASCADE_COUNT; i++)
+		cascade_images[i] = xy2d_gpualloc_create(vkdevice, XY2D_GPUALLOC_TYPE::ATTACHEMENT, {CASCADE_WIDTH, CASCADE_WIDTH});
+	
+	auto presentCallback = xy2d_callback_create(PresentScene);
+	xy2d_invoker_hook(renderer.renderEvent, presentCallback);
+	renderThread = new std::thread([](){ render_scene(); });
 }
+
+SDL_AppResult xy2d_window_loop(void* appstate, SDL_AppResult result) { return result; }
+SDL_AppResult xy2d_window_event(void*, SDL_Event* event, SDL_AppResult result) { return result; }
