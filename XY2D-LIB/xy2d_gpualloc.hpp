@@ -25,7 +25,6 @@
 		VkExtent2D length;
 		XY2D_GPUALLOC_TYPE type;
 		XY2D_GPUALLOC_LAYOUT layout = XY2D_GPUALLOC_LAYOUT::UNINITIALIZED;
-		
 		VkFormat rgbaFormat = VK_FORMAT_B8G8R8A8_UNORM;
 		VkColorComponentFlags rgbaWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 		VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
@@ -73,7 +72,8 @@
 			return vmaCreateBuffer(gpualloc.vkdevice->allocator, &bufCreateInfo, &allocCreateInfo, &gpualloc.buffer, &gpualloc.memory, &gpualloc.description);
 		} else {
 			if (gpualloc.type != XY2D_GPUALLOC_TYPE::SWAPCHAIN) {
-				VkImageCreateInfo imageCreateInfo = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .extent.depth = 1U, .mipLevels = 1U, .arrayLayers = 1U, .imageType = VK_IMAGE_TYPE_2D, .tiling = VK_IMAGE_TILING_OPTIMAL, .samples = VK_SAMPLE_COUNT_1_BIT, .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT };
+				VkImageUsageFlags storage = (gpualloc.type == XY2D_GPUALLOC_TYPE::STORAGE)? VK_IMAGE_USAGE_STORAGE_BIT : 0;
+				VkImageCreateInfo imageCreateInfo = { .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .extent.depth = 1U, .mipLevels = 1U, .arrayLayers = 1U, .imageType = VK_IMAGE_TYPE_2D, .tiling = VK_IMAGE_TILING_OPTIMAL, .samples = VK_SAMPLE_COUNT_1_BIT, .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | storage };
 				imageCreateInfo.extent.width = gpualloc.length.width;
 				imageCreateInfo.extent.height = gpualloc.length.height;
 				imageCreateInfo.initialLayout = static_cast<VkImageLayout>(gpualloc.layout);

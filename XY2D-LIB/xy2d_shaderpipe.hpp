@@ -59,8 +59,6 @@
 			for(glm::uint32_t j = 0; j < static_cast<glm::uint32_t>(shaderpipe.shaderSources[i].uniforms.size()); j++)
 				pbindings.push_back({ bindings++, static_cast<VkDescriptorType>(shaderpipe.shaderSources[i].uniforms[j]), 1U, static_cast<VkShaderStageFlags>(shaderpipe.shaderSources[i].shaderStage) });
 		
-		std::cout << "BINDIGN COUNT: " << pbindings.size() << std::endl;
-		
 		VkDescriptorSetLayoutCreateInfo descriptorCreateInfo = { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR };
 		descriptorCreateInfo.bindingCount = static_cast<uint32_t>(pbindings.size());
 		descriptorCreateInfo.pBindings = pbindings.data();
