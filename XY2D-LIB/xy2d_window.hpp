@@ -22,7 +22,7 @@
 	void xy2d_window_quit(void*, SDL_AppResult);
 	void xy2d_window_init();
 	SDL_AppResult xy2d_window_loop(void*, SDL_AppResult);
-	SDL_AppResult xy2d_window_event(void*, SDL_Event*, SDL_AppResult);
+	SDL_AppResult xy2d_window_event(void*, SDL_Event*, SDL_AppResult, const bool*);
 	
 	uint32_t xy2d_window_get_isopen() { return window.openState.load(std::memory_order_relaxed); }
 	uint32_t xy2d_window_get_width() { return window.width.load(std::memory_order_relaxed); }
@@ -56,7 +56,9 @@
 		SDL_GetWindowSizeInPixels(window.handle, &width, &height);
 		window.width.store(static_cast<uint32_t>(width), std::memory_order_relaxed);
 		window.height.store(static_cast<uint32_t>(height), std::memory_order_relaxed);
-		return xy2d_window_event(appstate, event, result);
+		
+		const bool* keystates = SDL_GetKeyboardState(VK_NULL_HANDLE);
+		return xy2d_window_event(appstate, event, result, keystates);
 	}
 	
 	static SDL_AppResult SDL_AppIterate(void* appstate) {

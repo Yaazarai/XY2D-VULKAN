@@ -55,7 +55,7 @@
 		return sizeof(xy2d_sprite::vertices);
 	}
 	
-	xy2d_sprite xy2d_sprite_create(glm::vec4 xywh, glm::vec4 uvwh, glm::vec2 xyscale, glm::vec2 xyorigin, glm::float32 theta = 0.0f, glm::float32 depth = 0.0f, glm::uint32 color = 0xFFFFFFFFU) {
+	xy2d_sprite xy2d_sprite_create(glm::vec4 xywh, glm::vec4 uvwh = {0.0, 0.0, 1.0, 1.0}, glm::vec2 xyscale = {0.0, 0.0}, glm::vec2 xyorigin = {0.0, 0.0}, glm::float32 theta = 0.0f, glm::float32 depth = 0.0f, glm::uint32 color = 0xFFFFFFFFU) {
 		return { .xywh = xywh, .uvwh = uvwh, .xyscale = xyscale, .xyorigin = xyorigin, .theta = theta, .depth = depth, .color = color };
 	}
 	

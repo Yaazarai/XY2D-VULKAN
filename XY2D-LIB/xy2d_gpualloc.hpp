@@ -83,9 +83,11 @@
 				if (result != VK_SUCCESS) return result;
 			}
 			
-			VkSamplerCreateInfo imageSamplerInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .magFilter = VK_FILTER_NEAREST, .minFilter = VK_FILTER_NEAREST, .anisotropyEnable = VK_FALSE, .compareEnable = VK_FALSE, .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK, .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .unnormalizedCoordinates = VK_FALSE, .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR, .minLod = 0.0f, .maxLod = VK_LOD_CLAMP_NONE };
+			VkSamplerMipmapMode samplerFilter = (gpualloc.lerpFilter)? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			VkFilter filter = (gpualloc.lerpFilter)? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+			VkSamplerCreateInfo imageSamplerInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .magFilter = filter, .minFilter = filter, .anisotropyEnable = VK_FALSE, .compareOp = VK_COMPARE_OP_ALWAYS, .compareEnable = VK_TRUE, .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK, .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, .unnormalizedCoordinates = VK_FALSE, .mipmapMode = samplerFilter, .minLod = 0.0f, .maxLod = VK_LOD_CLAMP_NONE };
 			imageSamplerInfo.addressModeU = imageSamplerInfo.addressModeV = imageSamplerInfo.addressModeW = gpualloc.addressMode;
-			imageSamplerInfo.mipmapMode = (gpualloc.lerpFilter)? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			imageSamplerInfo.mipmapMode = samplerFilter;
 			VkResult result = vkCreateSampler(gpualloc.vkdevice->logical, &imageSamplerInfo, VK_NULL_HANDLE, &gpualloc.sampler);
 			if (result != VK_SUCCESS) return result;
 			
@@ -97,7 +99,7 @@
 		}
 	}
 	
-	xy2d_gpualloc xy2d_gpualloc_create(xy2d_device& vkdevice, XY2D_GPUALLOC_TYPE allocType, VkExtent2D length, VkFormat rgbaFormat = VK_FORMAT_R16G16B16A16_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VkBool32 lerpFilter = false, VkImage imageSource = VK_NULL_HANDLE) {
+	xy2d_gpualloc xy2d_gpualloc_create(xy2d_device& vkdevice, XY2D_GPUALLOC_TYPE allocType, VkExtent2D length, VkBool32 lerpFilter = false, VkFormat rgbaFormat = VK_FORMAT_R16G16B16A16_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VkImage imageSource = VK_NULL_HANDLE) {
 		xy2d_gpualloc allocation = { .vkdevice = &vkdevice, .type = allocType, .length = length, .rgbaFormat = rgbaFormat, .addressMode = addressMode, .lerpFilter = lerpFilter, .image = imageSource };
 		xy2d_gpualloc_allocate(allocation);
 		return allocation;

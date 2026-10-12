@@ -10,7 +10,7 @@ void main() {
     vec2 resolution = vec2(textureSize(outputImage, 0));
 	vec2 pixelCoord = fragCoord * resolution;
 	vec2 circlePos = resolution * 0.5;
-	float circleRadius = 4.0;
+	float circleRadius = 6.0;
 	float dist = abs(length(pixelCoord - circlePos));
 	
 	outColor = vec4(0.0, 0.0, 0.0, 1.0);

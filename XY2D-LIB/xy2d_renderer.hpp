@@ -68,7 +68,7 @@
 		std::vector<VkImage> newSwapImages = std::vector<VkImage>(XY2D_BUFFERED_IMAGES);
 		xy2d_enumerate(newSwapImages, vkGetSwapchainImagesKHR, renderer.vkdevice->logical, renderer.swapChain);
 		for(uint32_t i = 0; i < renderer.swapChainImages.size(); i++)
-			renderer.swapChainImages[i] = xy2d_gpualloc_create(*renderer.vkdevice, XY2D_GPUALLOC_TYPE::SWAPCHAIN, { swapChainExtent.width, swapChainExtent.height }, renderer.presentFormat.format, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_FALSE, newSwapImages[i]);
+			renderer.swapChainImages[i] = xy2d_gpualloc_create(*renderer.vkdevice, XY2D_GPUALLOC_TYPE::SWAPCHAIN, { swapChainExtent.width, swapChainExtent.height }, VK_FALSE, renderer.presentFormat.format, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, newSwapImages[i]);
 		
 		if (renderer.swapChainAcquired != VK_NULL_HANDLE) vkDestroyFence(renderer.vkdevice->logical, renderer.swapChainAcquired, VK_NULL_HANDLE);
 		VkFenceCreateInfo unsignaledFenceCreateInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = static_cast<VkFenceCreateFlags>(VK_FALSE) };
