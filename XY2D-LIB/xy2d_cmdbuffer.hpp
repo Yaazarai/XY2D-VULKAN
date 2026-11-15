@@ -140,8 +140,11 @@
 		}
 	}
 	
-	void xy2d_render_begin(xy2d_cmdbuffer& cmdbuffer, xy2d_shaderpipe& pipeline, std::vector<xy2d_gpualloc*> imageTargets, glm::ivec4 xywh, xy2d_renderstate renderState = xy2d_renderstate()) {
+	void xy2d_render_begin(xy2d_cmdbuffer& cmdbuffer, xy2d_shaderpipe& pipeline, std::vector<xy2d_gpualloc*> imageTargets, glm::ivec4 xywh = { 0U, 0U, 0U, 0U }, xy2d_renderstate renderState = xy2d_renderstate()) {
 		xy2d_cmdbuffer_barrier(cmdbuffer, XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, imageTargets, XY2D_GPUALLOC_LAYOUT::GENERAL);
+		
+		if (xywh[0] == 0U && xywh[1] == 0U && xywh[2] == 0U && xywh[3] == 0U)
+			xywh = { 0U, 0U, imageTargets[0]->length.width, imageTargets[0]->length.height };
 		
 		VkRect2D renderArea = { .offset = { xywh[0], xywh[1] }, .extent = { static_cast<uint32_t>(xywh[2]), static_cast<uint32_t>(xywh[3]) } };
 		VkViewport dynamicViewPort = { .minDepth = 0.0f, .maxDepth = 1.0f, .width = static_cast<float>(xywh[2]), .height = static_cast<float>(xywh[3]), };
@@ -196,9 +199,9 @@
 		vkCmdEndRendering(cmdbuffer.cmdbuffer);
 	}
 	
-	void xy2d_render_bind_vertex_buffer(xy2d_cmdbuffer& cmdbuffer, xy2d_gpualloc* vertexBuffer, uint32_t firstBinding = 0U) {
+	void xy2d_render_bind_vertex_buffer(xy2d_cmdbuffer& cmdbuffer, xy2d_gpualloc& vertexBuffer, uint32_t firstBinding = 0U) {
 		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(cmdbuffer.cmdbuffer, firstBinding, 1, &vertexBuffer->buffer, offsets);
+		vkCmdBindVertexBuffers(cmdbuffer.cmdbuffer, firstBinding, 1, &vertexBuffer.buffer, offsets);
 	}
 	
 	void xy2d_render_draw_vertex_buffer(xy2d_cmdbuffer& cmdbuffer, uint32_t vertexCount, uint32_t firstVertex, uint32_t instanceCount) {
@@ -215,27 +218,29 @@
 		vkCmdDispatch(cmdbuffer.cmdbuffer, groupSize.x, groupSize.y, groupSize.z);
 	}
 	
-	void xy2d_transfer_buffer(xy2d_cmdbuffer& cmdbuffer, void* dataPointer, size_t sizeOfData, size_t offsetOfData, xy2d_gpualloc* stageBuffer, xy2d_gpualloc* buffer, uint32_t dstOffset = 0U) {
+	void xy2d_transfer_buffer(xy2d_cmdbuffer& cmdbuffer, xy2d_gpualloc& stagingBuffer, size_t& offsetOfData, xy2d_gpualloc& buffer, void* dataPointer, size_t sizeOfData, uint32_t dstOffset = 0U) {
 		xy2d_cmdbuffer_barrier(cmdbuffer, XY2D_PIPELINESTAGES::TRANSFER, XY2D_ACCESSSTAGES::TRANSFER, {});
-		void* stagedOffset = static_cast<int8_t*>(stageBuffer->description.pMappedData) + offsetOfData;
+		void* stagedOffset = static_cast<int8_t*>(stagingBuffer.description.pMappedData) + offsetOfData;
 		SDL_memcpy(stagedOffset, dataPointer, sizeOfData);
 		
 		VkBufferCopy copyRegion { .srcOffset = offsetOfData, .dstOffset = dstOffset, .size = sizeOfData };
-		vkCmdCopyBuffer(cmdbuffer.cmdbuffer, stageBuffer->buffer, buffer->buffer, 1, &copyRegion);
+		vkCmdCopyBuffer(cmdbuffer.cmdbuffer, stagingBuffer.buffer, buffer.buffer, 1, &copyRegion);
+		offsetOfData += sizeOfData;
 	}
 	
-	void xy2d_transfer_image(xy2d_cmdbuffer& cmdbuffer, void* dataPointer, uint32_t sizeOfData, uint32_t offsetOfData, uint32_t xpos, uint32_t ypos, uint32_t width, uint32_t height, xy2d_gpualloc* stageBuffer, xy2d_gpualloc* image) {
-		xy2d_cmdbuffer_barrier(cmdbuffer, XY2D_PIPELINESTAGES::TRANSFER, XY2D_ACCESSSTAGES::TRANSFER, { image });
-		void* stagedOffset = static_cast<int8_t*>(stageBuffer->description.pMappedData) + offsetOfData;
+	void xy2d_transfer_image(xy2d_cmdbuffer& cmdbuffer, xy2d_gpualloc& stagingBuffer, size_t& offsetOfData, xy2d_gpualloc& image, void* dataPointer, uint32_t sizeOfData, uint32_t xpos, uint32_t ypos, uint32_t width, uint32_t height) {
+		xy2d_cmdbuffer_barrier(cmdbuffer, XY2D_PIPELINESTAGES::TRANSFER, XY2D_ACCESSSTAGES::TRANSFER, { &image });
+		void* stagedOffset = static_cast<int8_t*>(stagingBuffer.description.pMappedData) + offsetOfData;
 		SDL_memcpy(stagedOffset, dataPointer, sizeOfData);
 		
 		VkBufferImageCopy copyRegion = {};
 		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		copyRegion.imageSubresource.layerCount = 1;
 		copyRegion.imageOffset = { .x = static_cast<int32_t>(xpos), .y = static_cast<int32_t>(ypos), .z = 0 };
-		copyRegion.imageExtent = { .width = width, .height = height, .depth = 1U };;
+		copyRegion.imageExtent = { .width = width, .height = height, .depth = 1U };
 		copyRegion.bufferOffset = static_cast<VkDeviceSize>(offsetOfData);
-		vkCmdCopyBufferToImage(cmdbuffer.cmdbuffer, stageBuffer->buffer, image->image, (VkImageLayout) image->layout, 1U, &copyRegion);
+		vkCmdCopyBufferToImage(cmdbuffer.cmdbuffer, stagingBuffer.buffer, image.image, (VkImageLayout) image.layout, 1U, &copyRegion);
+		offsetOfData += sizeOfData;
 	}
 #endif
 

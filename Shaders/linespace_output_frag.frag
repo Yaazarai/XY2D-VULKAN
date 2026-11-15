@@ -13,43 +13,21 @@ layout(binding = 4) uniform cascadeInfo {
 	int count;
 } cascade;
 
-#define RADIANS(n) ((n) * 6.283185)
-#define TAU 6.283185
+#define PI 3.141592653589793
 
-void trace(vec2 rxy, vec2 dxy, float interval, inout vec4 radiance, inout vec4 transmit) {
-	vec2 delta = dxy / max(abs(dxy.x), abs(dxy.y));
-	float step_length = length(delta);
-	vec2 inv_size = 1.0 / vec2(textureSize(sceneImage, 0));
-	for(float ii = 0.0; ii < interval; ii ++) {
-		vec2 ray = (rxy + (delta * ii)) * inv_size;
+void trace(vec2 probe, vec2 merge, vec2 extent, inout vec4 radiance, inout vec4 transmit) {
+	vec4 ray = vec4(probe, merge / max(abs(merge.y), abs(merge.x))) / extent.xyxy;
+	for(float ii = 0.0, op = length(ray.zw * extent.xy); ii < worldExt.x; ii ++, ray.xy += ray.zw) {
 		if (clamp(ray.xy, 0.0, 1.0) != ray.xy) break;
-		
-		vec4 emiss = texture(sceneImage, ray);
-		vec4 absrp = texture(sceneImage, ray);
-		vec4 optic = -absrp * step_length;
-		vec4 trans = exp2(optic);
-		vec4 radnc = emiss * (1.0 - trans);
-		radiance += radnc * transmit;
-		transmit *= trans;
+		vec3 tt = sqrt(exp2(-pow(texture(absorption, ray.xy).rgb * op, 2.0)));
+		vec3 rr = texture(emissivity, ray.xy).rgb;
+		radiance.rgb += (rr * (1.0 - tt)) * transmit.rgb;
+		transmit.rgb *= tt;
 	}
 }
 
 void main() {
-	vec2 world = vec2(textureSize(sceneImage, 0));
-	vec2 extent = vec2(textureSize(currentCascade, 0));
-	vec2 coord = fragCoord * world;
-	outColor = vec4(0.0);
 	
-	for(float i = 0; i < 256.0; i++) {
-		float theta = RADIANS((i / 256.0));
-		vec2 delta = vec2(cos(theta), -sin(theta));
-		
-		vec4 radiance = vec4(0.0), transmit = vec4(1.0);
-		trace(coord + delta * 0.25, delta, world.x, radiance, transmit);
-		outColor += radiance;
-	}
-	
-	outColor /= 256.0;
 }
 
 /*
