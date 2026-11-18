@@ -95,7 +95,7 @@ void render_scene() {
     }
 }
 ```
-The full example is provided in [source.cpp](https://github.com/Yaazarai/XY2D-VULKAN/blob/main/source.cpp).
+The full example is provided in [source.cpp](https://github.com/Yaazarai/XY2D-VULKAN/blob/main/source.cpp). If the project doesn't run you need to build your shaders and provide an image file for loading into the program that can be loaded by SDL3 (update source.cpp with the new image name).
 
 # Documentation
 The entire engine is pretty small sitting just under 1,000 lines of code with minimal dependencies. The library provides a small set of pre-included standard libraries, but requires the user to link directly to GLM, SDL3 and Vulkan 1.4.
