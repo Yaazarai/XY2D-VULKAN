@@ -96,3 +96,16 @@ void render_scene() {
 }
 ```
 The full example is provided in [source.cpp](https://github.com/Yaazarai/XY2D-VULKAN/blob/main/source.cpp).
+
+# Documentation
+The entire engine is pretty small sitting just under 1,000 lines of code with minimal dependencies. The library provides a small set of pre-included standard libraries, but requires the user to link directly to GLM, SDL3 and Vulkan 1.4.
+
+The [_BUILDENV.bat](https://github.com/Yaazarai/XY2D-VULKAN/blob/main/_BUILDENV.bat) file is a batch script that sets up the development environment in a console or VS code console by providing temporary build paths for each of the required libraries: GLM, SDL and Vulkan. Install the required libraries/SDKs and change the paths to those local to your machine.
+
+The [_CODE.bat](https://github.com/Yaazarai/XY2D-VULKAN/blob/main/_CODE.bat) file simply opens VS code to the path the file is in, which ideally and conveniently should be your project location. If you build through the VS Code console run this first then open VS Code's console and run `_BUILDENV.bat` there to setup your build environment.
+
+The [_DEBUG.bat](https://github.com/Yaazarai/XY2D-VULKAN/blob/main/_DEBUG.bat) and [_RELEASE.bat](https://github.com/Yaazarai/XY2D-VULKAN/blob/main/_RELEASE.bat) files are the build system or build commands which will automatically build your project from the local project folder by default and recursively find all of your associated header/source (h/hpp/c/cpp) files and build them to a `DEBUG` or `RELEASE` folder.
+
+The [_SHADERS.bat](https://github.com/Yaazarai/XY2D-VULKAN/blob/main/_SHADERS.bat) command builds SPIRV shader binaries from your GLSL vertex, fragment and compute shaders only and will push those shaders into their respective `DEBUG/Shaders` or `RELEASE/Shaders` build folders. The batch script takes one of two command line arguments `_DEBUG` or `_RELEASE` which should look something like `_SHADERS.bat _DEBUG` or `_SHADERS.bat _RELEASE` depending on how your building your project.
+
+The compiler used is `clang-cl` so make sure that you have that installed in-order to build. The nice thing about `clang-cl` is that it uses MSVC (Microsoft Compiler) build arguments which are well documented and easy to locate unlike most other compilers. I've kept a local list of those command line arguments under the `Documentation` folder via [msvccompileropt.txt](https://github.com/Yaazarai/XY2D-VULKAN/blob/main/Documentation/msvccompileropt.txt) file and how to use them in [info.txt](https://github.com/Yaazarai/XY2D-VULKAN/blob/main/Documentation/info.txt).
