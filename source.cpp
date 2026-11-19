@@ -4,7 +4,7 @@
 #define SCNE "./Shaders/scene_output_frag.spv"
 #define FRAG "./Shaders/texture_output_frag.spv"
 #define VERT "./Shaders/default_output_vert.spv"
-#define PHANTOM "./Images/phantom.png"
+#define PHANTOM "./Images/Rainbow_Shadows_Emissivity.png"
 #define CASCADE_WIDTH 1024
 #define CASCADE_COUNT 11
 
@@ -36,7 +36,7 @@ void xy2d_window_quit(void* appstate, SDL_AppResult result) {
 		delete renderThread;
 	}
 	
-	vkDeviceWaitIdle(vkdevice.logical);
+	xy2d_device_waitidle(vkdevice);
 	SDL_DestroySurface(phantom_surface);
 	xy2d_renderer_destroy(renderer);
 	xy2d_shaderpipe_destroy(pipeline_pres);
@@ -53,10 +53,8 @@ void PresentScene(xy2d_cmdbuffer& cmdbuffer, xy2d_gpualloc& swapChainImage) {
 	size_t staging_offset = 0U;
 	xy2d_transfer_buffer(cmdbuffer, pipeline_pres.stagingBuffer, staging_offset, camera_buffer, &cameraData, sizeof(xy2d_camera));
 	
-	if (frameIndex == 0) {
-		xy2d_transfer_buffer(cmdbuffer, pipeline_pres.stagingBuffer, staging_offset, vertex_buffer, present_sprite.vertices, xy2d_sprite_sizeof());
-		xy2d_transfer_image(cmdbuffer, pipeline_pres.stagingBuffer, staging_offset, sampler_image, phantom_surface->pixels, phantom_surface->w * phantom_surface->h * sizeof(uint32_t), 0U, 0U, 1024U, 1024U);
-	}
+	xy2d_transfer_buffer(cmdbuffer, pipeline_pres.stagingBuffer, staging_offset, vertex_buffer, present_sprite.vertices, xy2d_sprite_sizeof());
+	xy2d_transfer_image(cmdbuffer, pipeline_pres.stagingBuffer, staging_offset, sampler_image, phantom_surface->pixels, phantom_surface->w * phantom_surface->h * sizeof(uint32_t), 0U, 0U, 512U, 512U);
 	
 	xy2d_cmdbuffer_barrier(cmdbuffer, XY2D_PIPELINESTAGES::REMDER, XY2D_ACCESSSTAGES::RENDER, { &sampler_image });
 	xy2d_render_begin(cmdbuffer, pipeline_pres, { &swapChainImage });
@@ -71,13 +69,15 @@ void render_scene() {
 	
 	while(window.openState.load(std::memory_order_relaxed)) {
 		VkResult result = xy2d_renderer_frame_present(renderer);
-		std::cout << "FRAME: [" << frameIndex << "] : " << (renderer.frameTimeStamps[1] - renderer.frameTimeStamps[0]) << std::endl;
+		glm::float64_t frame_start = renderer.frameTimeStamps[1];
+		glm::float64_t frame_end = renderer.frameTimeStamps[1];
+		std::cout << "FRAME: [" << frameIndex << "] : " << (frame_end - frame_start) << std::endl;
 		frameIndex ++;
 	}
 }
 
 void xy2d_window_init() {
-	SDL_SetWindowSize(window.handle, 1024, 1024);
+	xy2d_window_set_size(1024, 1024);
 	vertex_shader = xy2d_shader_create(VERT, XY2D_SHADER_STAGE::VERTEX, { XY2D_SHADER_UNIFORM::UBO });
 	fragment_shader = xy2d_shader_create(FRAG, XY2D_SHADER_STAGE::FRAGMENT, { XY2D_SHADER_UNIFORM::SAMPLER });
 	
@@ -92,7 +92,7 @@ void xy2d_window_init() {
 	phantom_surface = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_BGRA32);
 	SDL_DestroySurface(surface);
 	
-	present_sprite = xy2d_sprite_create({0.0, 0.0, 1024.0, 1024.0}, {0.0, 0.0, 1.0, 1.0}, {1.0, 1.0}, {0.0, 0.0});
+	present_sprite = xy2d_sprite_create({0.0, 0.0, 1024.0, 1024.0});
 	
 	xy2d_sprite_size(present_sprite, {1024.0f, 1024.0f});
 	xy2d_sprite_update(present_sprite);

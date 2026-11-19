@@ -27,6 +27,7 @@
 	uint32_t xy2d_window_get_isopen() { return window.openState.load(std::memory_order_relaxed); }
 	uint32_t xy2d_window_get_width() { return window.width.load(std::memory_order_relaxed); }
 	uint32_t xy2d_window_get_height() { return window.height.load(std::memory_order_relaxed); }
+	bool     xy2d_window_set_size(uint32_t w, uint32_t h) { return SDL_SetWindowSize(window.handle, w, h); }
 	
 	static void SDL_AppQuit(void* appstate, SDL_AppResult result) {
 		xy2d_window_quit(appstate, result);
