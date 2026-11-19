@@ -37,8 +37,8 @@
 		if (vkdevice.instance != VK_NULL_HANDLE) vkDestroyInstance(vkdevice.instance, VK_NULL_HANDLE);
 	}
 	
-	VkResult xy2d_device_waitidle(xyu2d_device device) {
-		vkDeviceWaitIdle(vkdevice.logical);
+	VkResult xy2d_device_waitidle(xy2d_device device) {
+		vkDeviceWaitIdle(device.logical);
 	}
 	
 	VkResult xy2d_device_instance(xy2d_device& vkdevice) {
