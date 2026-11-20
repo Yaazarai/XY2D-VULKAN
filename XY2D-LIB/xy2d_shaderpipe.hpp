@@ -35,7 +35,7 @@
 	
 	struct xy2d_shaderpipe {
 		xy2d_device* vkdevice = VK_NULL_HANDLE;
-		xy2d_gpualloc stagingBuffer = {};
+		xy2d_gpualloc stagingBuffer = {}, vertexBuffer = {}, uniformBuffer = {};
 		VkDescriptorSetLayout descriptorLayout = VK_NULL_HANDLE;
 		VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 		std::vector<xy2d_shader> shaderSources;
@@ -50,9 +50,11 @@
 		if (shaderpipe.descriptorLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(shaderpipe.vkdevice->logical, shaderpipe.descriptorLayout, VK_NULL_HANDLE);
 		if (shaderpipe.pipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(shaderpipe.vkdevice->logical, shaderpipe.pipelineLayout, VK_NULL_HANDLE);
 		if (shaderpipe.stagingBuffer.buffer != VK_NULL_HANDLE) xy2d_gpualloc_destroy(shaderpipe.stagingBuffer);
+		if (shaderpipe.vertexBuffer.buffer != VK_NULL_HANDLE) xy2d_gpualloc_destroy(shaderpipe.vertexBuffer);
+		if (shaderpipe.uniformBuffer.buffer != VK_NULL_HANDLE) xy2d_gpualloc_destroy(shaderpipe.uniformBuffer);
 	}
 	
-	xy2d_shaderpipe xy2d_shaderpipe_create(xy2d_device& vkdevice, std::vector<xy2d_shader> shaderSources, uint32_t stageBufferSize = 0U) {
+	xy2d_shaderpipe xy2d_shaderpipe_create(xy2d_device& vkdevice, std::vector<xy2d_shader> shaderSources, uint32_t stageBufferSize = 0U, uint32_t vertexBufferSize = 0U, uint32_t uniformBufferSize = 0U) {
 		xy2d_shaderpipe shaderpipe = { .vkdevice = &vkdevice, .shaderSources = shaderSources, .initialized = VK_SUCCESS };
 		std::vector<VkDescriptorSetLayoutBinding> pbindings;
 		for(glm::uint32_t bindings = 0, i = 0; i < static_cast<glm::uint32_t>(shaderpipe.shaderSources.size()); i++)
@@ -84,7 +86,15 @@
 		
 		shaderpipe.shaderObjects.resize(shaderpipe.shaderSources.size());
 		vkCreateShadersEXTXY2D(vkdevice.logical, static_cast<uint32_t>(sinfos.size()), sinfos.data(), VK_NULL_HANDLE, shaderpipe.shaderObjects.data());
-		shaderpipe.stagingBuffer = xy2d_gpualloc_create(vkdevice, XY2D_GPUALLOC_TYPE::STAGING, { stageBufferSize, 0U });
+		
+		if (stageBufferSize > 0)
+			shaderpipe.stagingBuffer = xy2d_gpualloc_create(vkdevice, XY2D_GPUALLOC_TYPE::STAGING, { stageBufferSize, 0U });
+			
+		if (vertexBufferSize > 0)
+			shaderpipe.vertexBuffer = xy2d_gpualloc_create(vkdevice, XY2D_GPUALLOC_TYPE::VERTEX, { vertexBufferSize, 0U });
+			
+		if (uniformBufferSize > 0)
+			shaderpipe.uniformBuffer = xy2d_gpualloc_create(vkdevice, XY2D_GPUALLOC_TYPE::UNIFORM, { uniformBufferSize, 0U });
 		return shaderpipe;
 	}
 #endif
