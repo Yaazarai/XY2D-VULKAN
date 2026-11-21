@@ -61,6 +61,7 @@
 	#include "./xy2d_shaderpipe.hpp"
 	#include "./xy2d_cmdbuffer.hpp"
 	#include "./xy2d_renderer.hpp"
+	#include "./xy2d_subpasses.hpp"
 	#include "./xy2d_sprite.hpp"
 #endif
 
