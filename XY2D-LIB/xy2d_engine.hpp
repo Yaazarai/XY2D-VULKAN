@@ -1,10 +1,9 @@
 #pragma once
 #ifndef __XY2D_ENGINE
 #define __XY2D_ENGINE
+	#define XY2D_VALIDATION false
 	#ifdef _DEBUG
 		#define XY2D_VALIDATION true
-	#else
-		#define XY2D_VALIDATION false
 	#endif
 	
 	#define GLM_FORCE_RADIANS
@@ -29,7 +28,6 @@
 	#define XY2D_ENGINE_VERSION VK_API_VERSION_1_4
 	#define XY2D_ENGINE_NAME "XY2D_ENGINE"
 	#include <vulkan/vulkan.h>
-	#include <vulkan/vulkan.hpp>
 	#include <vulkan/utility/vk_format_utils.h>
 	
 	#ifndef XY2D_BUFFERED_IMAGES
@@ -43,10 +41,8 @@
 	#endif
 	
 	#include <thread>
-	#include <filesystem>
 	#include <fstream>
 	#include <iostream>
-	#include <sstream>
 	#include <string>
 	#include <vector>
 	#include <functional>
